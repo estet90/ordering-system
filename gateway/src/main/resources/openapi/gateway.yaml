@@ -1,0 +1,78 @@
+openapi: 3.0.2
+info:
+  title: organizational-structure-service
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080/ordering-system-gateway/api/v1
+
+security:
+  - basicAuth: [ ]
+
+paths:
+  /orders:
+    get:
+      operationId: getOrders
+      responses:
+        "200":
+          $ref: "#/components/responses/GetOrdersResponse"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+components:
+  responses:
+    GetOrdersResponse:
+      description: Успех
+      content:
+        application/json;charset=UTF-8:
+          schema:
+            $ref: '#/components/schemas/GetOrdersResponseData'
+    ErrorResponse:
+      description: Ошибка
+      content:
+        application/json;charset=UTF-8:
+          schema:
+            $ref: '#/components/schemas/ErrorResponseData'
+  schemas:
+    GetOrdersResponseData:
+      type: array
+      items:
+        $ref: "#/components/schemas/Order"
+    Order:
+      type: object
+      required:
+        - id
+        - name
+        - price
+        - customerId
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        price:
+          type: number
+        customerId:
+          type: integer
+          format: int64
+    ErrorResponseData:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        originalCode:
+          type: string
+        originalMessage:
+          type: string
+        details:
+          type: array
+          items:
+            type: string
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic

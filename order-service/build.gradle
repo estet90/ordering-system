@@ -1,0 +1,12 @@
+dependencies {
+    implementation project(":util-lib")
+    implementation project(":order-service:order-api")
+    compileOnly("org.projectlombok:lombok")
+    [
+            "com.google.dagger:dagger-compiler:$daggerVersion",
+            "org.projectlombok:lombok:$lombokVersion",
+    ].forEach {
+        annotationProcessor(it)
+        testAnnotationProcessor(it)
+    }
+}

@@ -1,0 +1,39 @@
+plugins {
+    id "java-library"
+    id "com.google.protobuf" version "0.8.17"
+}
+
+dependencies {
+    api(
+            "com.google.protobuf:protoc:$protobufVersion",
+            "io.grpc:grpc-services:$grpcVersion",
+            "javax.annotation:javax.annotation-api:$annotationApiVersion",
+    )
+    protobuf files("src/main/resources/proto")
+}
+
+String generatedProtoFilesPath = "${projectDir}/build/generated/sources/proto"
+
+protobuf {
+    generatedFilesBaseDir = "${generatedProtoFilesPath}"
+    protoc {
+        artifact = "com.google.protobuf:protoc:$protobufVersion"
+    }
+    plugins {
+        grpc {
+            artifact = "io.grpc:protoc-gen-grpc-java:$grpcVersion"
+        }
+    }
+    generateProtoTasks {
+        all()*.plugins {
+            grpc
+        }
+    }
+}
+
+sourceSets.main.java {
+    srcDirs(
+            "${generatedProtoFilesPath}/main/java",
+            "${generatedProtoFilesPath}/main/grpc",
+    )
+}

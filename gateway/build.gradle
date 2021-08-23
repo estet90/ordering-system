@@ -1,0 +1,64 @@
+import org.openapitools.generator.gradle.plugin.tasks.GenerateTask
+
+plugins {
+    id "org.openapi.generator" version "5.2.1"
+    id "application"
+}
+
+dependencies {
+    implementation project(":util-lib")
+    implementation project(":user-service:user-api")
+    implementation project(":order-service:order-api")
+    implementation(
+            "io.vertx:vertx-web:$vertxVersion",
+            "org.jboss.resteasy:resteasy-vertx:$resteasyVersion",
+    )
+    compileOnly(
+            "org.projectlombok:lombok",
+            "io.swagger:swagger-annotations:$swaggerAnnotationsVersion",
+            "jakarta.validation:jakarta.validation-api:3.0.0",
+    )
+    [
+            "com.google.dagger:dagger-compiler:$daggerVersion",
+            "org.projectlombok:lombok:$lombokVersion",
+            "org.hibernate.validator:hibernate-validator-annotation-processor:$hibernateValidatorVersion",
+    ].forEach {
+        annotationProcessor(it)
+        testAnnotationProcessor(it)
+    }
+}
+
+def generatedFilesPath = "$projectDir/build/generated/sources"
+def generatedOpenapiFilesPath = "$generatedFilesPath/openapi"
+
+task generateRestApiWrap() {
+    def openapiInputFolder = "$projectDir/src/main/resources/openapi"
+    def openapiInputSpec = "$openapiInputFolder/gateway.yaml"
+    inputs.file("$openapiInputSpec")
+    outputs.dir("$generatedOpenapiFilesPath")
+    doLast {
+        task generateRestApi(type: GenerateTask) {
+            generatorName = "jaxrs-spec"
+            inputSpec = "$openapiInputSpec"
+            templateDir = "$openapiInputFolder"
+            outputDir = "$generatedOpenapiFilesPath"
+            modelPackage = "ru.craftysoft.orderingsystem.gateway.rest.model"
+            apiPackage = "ru.craftysoft.orderingsystem.gateway.controller"
+            generateModelTests = false
+            configOptions = [
+                    openApiNullable: "false",
+                    dateLibrary    : "java8",
+                    interfaceOnly  : "true",
+            ]
+        }
+        generateRestApi.doWork()
+    }
+}
+
+application.getMainClass().set("ru.craftysoft.orderingsystem.gateway.Application")
+
+sourceSets.main.java.srcDirs("$generatedOpenapiFilesPath/src/gen/java", "$generatedFilesPath/annotationProcessor/java/main")
+
+tasks.withType(JavaCompile) {
+    dependsOn(generateRestApiWrap)
+}

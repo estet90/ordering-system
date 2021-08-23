@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package ru.craftysoft.orderingsystem.user.proto;
+
+option java_multiple_files = true;
+
+import "google/protobuf/wrappers.proto";
+
+service UserService {
+  rpc getRoles(GetRolesRequest) returns (GetRolesResponse);
+}
+
+message GetRolesRequest {
+  string userLogin = 1;
+  string userPassword = 2;
+}
+
+
+message GetRolesResponse {
+  oneof GetRolesResponseDataOrError {
+    GetRolesResponseData getRolesResponseData = 1;
+    Error error = 2;
+  }
+}
+
+message GetRolesResponseData {
+  repeated string roles = 1;
+}
+
+message Error {
+  string code = 1;
+  string message = 2;
+  google.protobuf.StringValue originalCode = 3;
+  google.protobuf.StringValue originalMessage = 4;
+  repeated google.protobuf.StringValue details = 5;
+}

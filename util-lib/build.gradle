@@ -1,0 +1,41 @@
+plugins {
+    id "java-library"
+}
+
+dependencies {
+    api platform("com.fasterxml.jackson:jackson-bom:$jacksonVersion")
+    api(
+            "io.grpc:grpc-services:$grpcVersion",
+            "io.grpc:grpc-netty:$grpcVersion",
+            "com.google.protobuf:protobuf-java-util:$protobufVersion",
+            "io.netty:netty-transport-native-epoll:4.1.65.Final:linux-x86_64",
+            "io.netty:netty-transport-native-kqueue:4.1.65.Final:osx-x86_64",
+
+            "com.fasterxml.jackson.core:jackson-core",
+            "com.fasterxml.jackson.module:jackson-module-parameter-names",
+            "com.fasterxml.jackson.datatype:jackson-datatype-jdk8",
+            "com.fasterxml.jackson.datatype:jackson-datatype-jsr310",
+
+            "org.slf4j:slf4j-api:$slf4jVersion",
+            "org.slf4j:jul-to-slf4j:$slf4jVersion",
+            "ch.qos.logback:logback-classic:$logbackVersion",
+
+            "com.google.code.findbugs:jsr305:$findbugsVersion",
+            "org.glassfish:jakarta.el:$jakartaElVersion",
+            "org.hibernate.validator:hibernate-validator:$hibernateValidatorVersion",
+
+            "org.postgresql:postgresql:$postgresqlVersion",
+            "com.zaxxer:HikariCP:$hikariVersion",
+
+            "com.google.dagger:dagger:$daggerVersion",
+            "org.projectlombok:lombok:$lombokVersion",
+    )
+    compileOnly("org.projectlombok:lombok")
+    [
+            "com.google.dagger:dagger-compiler:$daggerVersion",
+            "org.projectlombok:lombok:$lombokVersion",
+    ].forEach {
+        annotationProcessor(it)
+        testAnnotationProcessor(it)
+    }
+}

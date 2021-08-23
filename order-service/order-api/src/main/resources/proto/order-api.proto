@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package ru.craftysoft.orderingsystem.order.proto;
+
+option java_multiple_files = true;
+
+import "google/protobuf/wrappers.proto";
+
+service OrderService {
+  rpc getOrders(GetOrdersRequest) returns (GetOrdersResponse);
+}
+
+message GetOrdersRequest {
+}
+
+
+message GetOrdersResponse {
+  oneof GetOrdersResponseDataOrError {
+    GetOrdersResponseData getOrdersResponseData = 1;
+    Error error = 2;
+  }
+}
+
+message GetOrdersResponseData {
+  repeated Order orders = 1;
+}
+
+message Order {
+  int64 id = 1;
+  string name = 2;
+  float price = 3;
+  int64 customerId = 4;
+}
+
+message Error {
+  string code = 1;
+  string message = 2;
+  google.protobuf.StringValue originalCode = 3;
+  google.protobuf.StringValue originalMessage = 4;
+  repeated google.protobuf.StringValue details = 5;
+}

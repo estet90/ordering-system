@@ -1,0 +1,1 @@
+CREATE TYPE orders.order_status AS ENUM ('unavailable', 'reserved', 'active', 'complete');

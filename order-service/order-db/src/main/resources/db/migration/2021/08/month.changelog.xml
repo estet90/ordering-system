@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.1.xsd">
+    <changeSet id="ORDERS_1" author="dkononov">
+        <comment>создание перечисления order_status</comment>
+        <sqlFile path="1_order_status.sql" endDelimiter=";" relativeToChangelogFile="true"/>
+    </changeSet>
+    <changeSet id="ORDERS_2" author="dkononov">
+        <comment>создание таблицы orders</comment>
+        <sqlFile path="2_orders.sql" endDelimiter=";" relativeToChangelogFile="true"/>
+    </changeSet>
+    <changeSet id="ORDERS_3" author="dkononov">
+        <comment>добавление прав</comment>
+        <sqlFile path="3_grants.sql" endDelimiter=";" relativeToChangelogFile="true"/>
+    </changeSet>
+    <changeSet id="ORDERS_4" author="dkononov">
+        <comment>тестовые данные</comment>
+        <sqlFile path="4_data.sql" endDelimiter=";" relativeToChangelogFile="true"/>
+    </changeSet>
+</databaseChangeLog>
