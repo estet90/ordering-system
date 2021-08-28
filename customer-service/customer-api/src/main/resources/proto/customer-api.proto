@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package ru.craftysoft.orderingsystem.customer.proto;
+
+option java_multiple_files = true;
+
+import "google/protobuf/wrappers.proto";
+import "google/type/money.proto";
+
+service CustomerService {
+  rpc getCustomer(GetCustomerRequest) returns (GetCustomerResponse);
+
+  rpc updateCustomerBalance(UpdateCustomerBalanceRequest) returns (UpdateCustomerBalanceResponse);
+}
+
+message GetCustomerRequest {
+  oneof idOrUserId {
+    int64 id = 1;
+    int64 userId = 2;
+  }
+}
+
+message GetCustomerResponse {
+  oneof GetCustomerResponseDataOrError {
+    GetCustomerResponseData getCustomerResponseData = 1;
+    Error error = 2;
+  }
+}
+
+message GetCustomerResponseData {
+  int64 id = 1;
+  google.type.Money balance = 2;
+}
+
+message UpdateCustomerBalanceRequest {
+  int64 id = 1;
+  oneof IncrementOrDecrementAmount {
+    google.type.Money incrementAmount = 2;
+    google.type.Money decreaseAmount = 3;
+  }
+}
+
+message UpdateCustomerBalanceResponse {
+  oneof UpdateCustomerBalanceResponseDataOrError {
+    UpdateCustomerBalanceResponseData updateCustomerBalanceResponseData = 1;
+    Error error = 2;
+  }
+}
+
+message UpdateCustomerBalanceResponseData {
+  google.type.Money balance = 1;
+  Result result = 2;
+  enum Result {
+    BALANCE_HAS_BEEN_CHANGED = 0;
+    BALANCE_HAS_NOT_BEEN_CHANGED = 1;
+  }
+}
+
+message Error {
+  string code = 1;
+  string message = 2;
+  google.protobuf.StringValue originalCode = 3;
+  google.protobuf.StringValue originalMessage = 4;
+  repeated google.protobuf.StringValue details = 5;
+}

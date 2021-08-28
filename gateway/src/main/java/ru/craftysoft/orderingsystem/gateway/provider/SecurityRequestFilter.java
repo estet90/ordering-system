@@ -24,15 +24,18 @@ import static javax.ws.rs.core.HttpHeaders.AUTHORIZATION;
 public class SecurityRequestFilter implements ContainerRequestFilter {
 
     private final UserServiceClientAdapter userServiceClientAdapter;
+    private final Base64.Decoder decoder;
 
     @Inject
     public SecurityRequestFilter(UserServiceClientAdapter userServiceClientAdapter) {
         this.userServiceClientAdapter = userServiceClientAdapter;
+        this.decoder = Base64.getDecoder();
     }
 
     @Override
     public void filter(ContainerRequestContext requestContext) {
         var postMatchContainerRequestContext = (PostMatchContainerRequestContext) requestContext;
+        postMatchContainerRequestContext.suspend();
         var method = postMatchContainerRequestContext.getResourceMethod().getMethod();
         if (method.isAnnotationPresent(RolesAllowed.class)) {
             var authorization = requestContext.getHeaderString(AUTHORIZATION);
@@ -40,10 +43,10 @@ public class SecurityRequestFilter implements ContainerRequestFilter {
                 var errorResponse = Response.status(Response.Status.UNAUTHORIZED)
                         .entity("[\"Unauthorized\"]")
                         .build();
-                requestContext.abortWith(errorResponse);
+                postMatchContainerRequestContext.abortWith(errorResponse);
                 return;
             }
-            var parts = (new String(Base64.getDecoder().decode(authorization.substring("Basic ".length())), StandardCharsets.UTF_8)).split(":");
+            var parts = new String(decoder.decode(authorization.substring("Basic ".length())), StandardCharsets.UTF_8).split(":");
             var username = parts[0];
             var password = parts[1];
             var rolesAllowedAnnotation = method.getAnnotation(RolesAllowed.class);
@@ -54,7 +57,9 @@ public class SecurityRequestFilter implements ContainerRequestFilter {
                             var errorResponse = Response.status(Response.Status.FORBIDDEN)
                                     .entity("[\"Forbidden\"]")
                                     .build();
-                            requestContext.abortWith(errorResponse);
+                            postMatchContainerRequestContext.abortWith(errorResponse);
+                        } else {
+                            postMatchContainerRequestContext.resume();
                         }
                     });
         }

@@ -8,8 +8,8 @@ dependencies {
             "io.grpc:grpc-services:$grpcVersion",
             "io.grpc:grpc-netty:$grpcVersion",
             "com.google.protobuf:protobuf-java-util:$protobufVersion",
-            "io.netty:netty-transport-native-epoll:4.1.65.Final:linux-x86_64",
-            "io.netty:netty-transport-native-kqueue:4.1.65.Final:osx-x86_64",
+            "io.netty:netty-transport-native-epoll:$nettyVersion:linux-x86_64",
+            "io.netty:netty-transport-native-kqueue:$nettyVersion:osx-x86_64",
 
             "com.fasterxml.jackson.core:jackson-core",
             "com.fasterxml.jackson.module:jackson-module-parameter-names",
@@ -26,6 +26,8 @@ dependencies {
 
             "org.postgresql:postgresql:$postgresqlVersion",
             "com.zaxxer:HikariCP:$hikariVersion",
+
+            "io.lettuce:lettuce-core:$lettuceVersion",
 
             "com.google.dagger:dagger:$daggerVersion",
             "org.projectlombok:lombok:$lombokVersion",

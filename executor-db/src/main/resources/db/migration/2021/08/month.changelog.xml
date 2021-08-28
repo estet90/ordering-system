@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.1.xsd">
+    <changeSet id="EXECUTORS_1" author="dkononov">
+        <comment>создание таблицы executors</comment>
+        <sqlFile path="1_executors.sql" endDelimiter=";" relativeToChangelogFile="true"/>
+    </changeSet>
+    <changeSet id="EXECUTORS_2" author="dkononov">
+        <comment>добавление прав</comment>
+        <sqlFile path="2_grants.sql" endDelimiter=";" relativeToChangelogFile="true"/>
+    </changeSet>
+    <changeSet id="EXECUTORS_3" author="dkononov">
+        <comment>тестовые данные</comment>
+        <sqlFile path="3_data.sql" endDelimiter=";" relativeToChangelogFile="true"/>
+    </changeSet>
+</databaseChangeLog>

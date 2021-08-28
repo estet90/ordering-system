@@ -1,12 +1,17 @@
 package ru.craftysoft.orderingsystem.order.service.dao;
 
+import com.google.type.Money;
 import io.grpc.Context;
+import ru.craftysoft.orderingsystem.order.dto.AddedOrder;
 import ru.craftysoft.orderingsystem.order.dto.Order;
+import ru.craftysoft.orderingsystem.order.proto.AddOrderRequest;
+import ru.craftysoft.orderingsystem.order.proto.ReserveOrderRequest;
 import ru.craftysoft.orderingsystem.util.properties.PropertyResolver;
 
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
@@ -18,7 +23,9 @@ public class OrderDaoAdapter {
 
     private final OrderDao dao;
     private final Executor dbExecutor;
-    private final String status;
+    private final String statusActive;
+    private final String statusUnavailable;
+    private final String statusReserved;
 
     @Inject
     public OrderDaoAdapter(OrderDao dao,
@@ -26,13 +33,56 @@ public class OrderDaoAdapter {
                            PropertyResolver propertyResolver) {
         this.dao = dao;
         this.dbExecutor = dbExecutor;
-        this.status = propertyResolver.getStringProperty("db.query-parameter.orders.order-status");
+        this.statusActive = propertyResolver.getStringProperty("db.query-parameter.orders.order-status.active");
+        this.statusUnavailable = propertyResolver.getStringProperty("db.query-parameter.orders.order-status.unavailable");
+        this.statusReserved = propertyResolver.getStringProperty("db.query-parameter.orders.order-status.reserved");
     }
 
     public CompletableFuture<List<Order>> getOrders() {
         var context = Context.current();
         return CompletableFuture.supplyAsync(
-                () -> withContext(context, () -> dao.getOrders(this.status)),
+                () -> withContext(context, () -> dao.getOrders(this.statusActive)),
+                dbExecutor
+        );
+    }
+
+    public CompletableFuture<Long> addOrder(AddOrderRequest request) {
+        var context = Context.current();
+        var price = request.getPrice();
+        var balance = request.getCustomer().getBalance();
+        var status = resolveStatus(price, balance);
+        var addedOrder = new AddedOrder(
+                request.getName(),
+                new BigDecimal(price.toString()),
+                request.getCustomer().getId(),
+                status
+        );
+        return CompletableFuture.supplyAsync(
+                () -> withContext(context, () -> dao.addOrder(addedOrder)),
+                dbExecutor
+        );
+    }
+
+    private String resolveStatus(Money price, Money balance) {
+        if (price.getUnits() < balance.getUnits()) {
+            return statusActive;
+        } else if (price.getUnits() == balance.getUnits()) {
+            return price.getNanos() <= balance.getNanos()
+                    ? statusActive
+                    : statusUnavailable;
+        }
+        return statusUnavailable;
+    }
+
+    public CompletableFuture<Integer> reserveOrder(ReserveOrderRequest request) {
+        var context = Context.current();
+        return CompletableFuture.supplyAsync(
+                () -> withContext(context, () -> dao.updateOrderStatus(
+                        request.getId(),
+                        request.getExecutorId(),
+                        statusActive,
+                        statusReserved
+                )),
                 dbExecutor
         );
     }

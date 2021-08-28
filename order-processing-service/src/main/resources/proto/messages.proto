@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package ru.craftysoft.orderingsystem.orderprocessing.proto;
+
+option java_multiple_files = true;
+
+import "google/protobuf/wrappers.proto";
+import "google/type/money.proto";
+
+message IncrementCustomerAmountRequest {
+  RetryData retryData = 1;
+  int64 orderId = 2;
+  int64 customerId = 3;
+  int64 executorId = 4;
+  google.type.Money amount = 5;
+}
+
+message DecreaseCustomerAmountRequest {
+  RetryData retryData = 1;
+  int64 orderId = 2;
+  int64 customerId = 3;
+  int64 executorId = 4;
+  google.type.Money amount = 5;
+}
+
+message IncrementExecutorAmountRequest {
+  RetryData retryData = 1;
+  int64 orderId = 2;
+  int64 customerId = 3;
+  int64 executorId = 4;
+  google.type.Money amount = 5;
+  google.type.Money customerBalance = 6;
+}
+
+message DecreaseExecutorAmountRequest {
+  RetryData retryData = 1;
+  int64 orderId = 2;
+  int64 customerId = 3;
+  int64 executorId = 4;
+  google.type.Money amount = 5;
+}
+
+message ReserveOrderRequest {
+  RetryData retryData = 1;
+  int64 orderId = 2;
+}
+
+message CompleteOrderRequest {
+  RetryData retryData = 1;
+  int64 orderId = 2;
+  int64 customerId = 3;
+  int64 executorId = 4;
+  google.type.Money amount = 5;
+  google.type.Money customerBalance = 6;
+}
+
+message RetryData {
+  int32 counter = 1;
+}

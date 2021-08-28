@@ -1,0 +1,37 @@
+plugins {
+    id "com.google.protobuf" version "$protobufGradleOluginVersion"
+}
+
+dependencies {
+    implementation project(":util-lib")
+    implementation project(":customer-service:customer-api")
+    implementation project(":executor-service:executor-api")
+    implementation(
+            "com.google.protobuf:protoc:$protobufVersion",
+    )
+    compileOnly("org.projectlombok:lombok")
+    [
+            "com.google.dagger:dagger-compiler:$daggerVersion",
+            "org.projectlombok:lombok:$lombokVersion",
+    ].forEach {
+        annotationProcessor(it)
+        testAnnotationProcessor(it)
+    }
+    protobuf files("src/main/resources/proto")
+}
+
+String generatedProtoFilesPath = "${projectDir}/build/generated/sources/proto"
+
+protobuf {
+    generatedFilesBaseDir = "${generatedProtoFilesPath}"
+    protoc {
+        artifact = "com.google.protobuf:protoc:$protobufVersion"
+    }
+}
+
+sourceSets.main.java {
+    srcDirs(
+            "${generatedProtoFilesPath}/main/java",
+            "${generatedProtoFilesPath}/main/grpc",
+    )
+}

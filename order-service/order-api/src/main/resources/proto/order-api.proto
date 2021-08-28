@@ -5,9 +5,14 @@ package ru.craftysoft.orderingsystem.order.proto;
 option java_multiple_files = true;
 
 import "google/protobuf/wrappers.proto";
+import "google/type/money.proto";
 
 service OrderService {
   rpc getOrders(GetOrdersRequest) returns (GetOrdersResponse);
+
+  rpc addOrder(AddOrderRequest) returns (AddOrderResponse);
+
+  rpc reserveOrder(ReserveOrderRequest) returns (ReserveOrderResponse);
 }
 
 message GetOrdersRequest {
@@ -23,13 +28,53 @@ message GetOrdersResponse {
 
 message GetOrdersResponseData {
   repeated Order orders = 1;
+  message Order {
+    int64 id = 1;
+    string name = 2;
+    google.type.Money price = 3;
+    int64 customerId = 4;
+  }
 }
 
-message Order {
+message AddOrderRequest {
+  string name = 1;
+  google.type.Money price = 2;
+  Customer customer = 3;
+  message Customer {
+    int64 id = 1;
+    google.type.Money balance = 2;
+  }
+}
+
+message AddOrderResponse {
+  oneof AddOrderResponseDataOrError {
+    AddOrderResponseData addOrderResponseData = 1;
+    Error error = 2;
+  }
+}
+
+message AddOrderResponseData {
   int64 id = 1;
-  string name = 2;
-  float price = 3;
-  int64 customerId = 4;
+}
+
+message ReserveOrderRequest {
+  int64 id = 1;
+  int64 executorId = 2;
+}
+
+message ReserveOrderResponse {
+  oneof ReserveOrderResponseDataOrError {
+    ReserveOrderResponseData reserveOrderResponseData = 1;
+    Error error = 2;
+  }
+}
+
+message ReserveOrderResponseData {
+  Result result = 1;
+  enum Result {
+    RESERVED = 0;
+    FAILED_TO_RESERVE = 2;
+  }
 }
 
 message Error {

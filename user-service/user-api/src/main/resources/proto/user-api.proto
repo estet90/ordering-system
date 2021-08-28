@@ -8,6 +8,7 @@ import "google/protobuf/wrappers.proto";
 
 service UserService {
   rpc getRoles(GetRolesRequest) returns (GetRolesResponse);
+  rpc getUserId(GetUserIdRequest) returns (GetUserIdResponse);
 }
 
 message GetRolesRequest {
@@ -25,6 +26,21 @@ message GetRolesResponse {
 
 message GetRolesResponseData {
   repeated string roles = 1;
+}
+
+message GetUserIdRequest {
+  string login = 1;
+}
+
+message GetUserIdResponse {
+  oneof GetUserIdResponseDataOrError {
+    GetUserIdResponseData getUserResponseData = 1;
+    Error error = 2;
+  }
+}
+
+message GetUserIdResponseData {
+  int64 id = 1;
 }
 
 message Error {

@@ -5,7 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import ru.craftysoft.orderingsystem.user.proto.GetRolesRequest;
 import ru.craftysoft.orderingsystem.user.proto.GetRolesResponse;
 import ru.craftysoft.orderingsystem.user.proto.GetRolesResponseData;
-import ru.craftysoft.orderingsystem.user.service.dao.RoleDaoAdapter;
+import ru.craftysoft.orderingsystem.user.service.dao.UserDaoAdapter;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -17,10 +17,10 @@ import static ru.craftysoft.orderingsystem.util.mdc.MdcUtils.withContext;
 @Slf4j
 public class GetRolesOperation {
 
-    private final RoleDaoAdapter roleDaoAdapter;
+    private final UserDaoAdapter roleDaoAdapter;
 
     @Inject
-    public GetRolesOperation(RoleDaoAdapter roleDaoAdapter) {
+    public GetRolesOperation(UserDaoAdapter roleDaoAdapter) {
         this.roleDaoAdapter = roleDaoAdapter;
     }
 

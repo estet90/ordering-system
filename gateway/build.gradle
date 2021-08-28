@@ -1,7 +1,7 @@
 import org.openapitools.generator.gradle.plugin.tasks.GenerateTask
 
 plugins {
-    id "org.openapi.generator" version "5.2.1"
+    id "org.openapi.generator" version "$openapiGradlePluginVersion"
     id "application"
 }
 
@@ -9,14 +9,17 @@ dependencies {
     implementation project(":util-lib")
     implementation project(":user-service:user-api")
     implementation project(":order-service:order-api")
+    implementation project(":customer-service:customer-api")
+    implementation project(":executor-service:executor-api")
     implementation(
             "io.vertx:vertx-web:$vertxVersion",
             "org.jboss.resteasy:resteasy-vertx:$resteasyVersion",
+            "org.jboss.resteasy:resteasy-jackson2-provider:$resteasyVersion"
     )
     compileOnly(
             "org.projectlombok:lombok",
             "io.swagger:swagger-annotations:$swaggerAnnotationsVersion",
-            "jakarta.validation:jakarta.validation-api:3.0.0",
+            "jakarta.validation:jakarta.validation-api:$jakartaValidationApiVersion",
     )
     [
             "com.google.dagger:dagger-compiler:$daggerVersion",
@@ -33,17 +36,17 @@ def generatedOpenapiFilesPath = "$generatedFilesPath/openapi"
 
 task generateRestApiWrap() {
     def openapiInputFolder = "$projectDir/src/main/resources/openapi"
-    def openapiInputSpec = "$openapiInputFolder/gateway.yaml"
+    def openapiInputSpec = "$openapiInputFolder/order.yaml"
     inputs.file("$openapiInputSpec")
     outputs.dir("$generatedOpenapiFilesPath")
     doLast {
         task generateRestApi(type: GenerateTask) {
             generatorName = "jaxrs-spec"
             inputSpec = "$openapiInputSpec"
-            templateDir = "$openapiInputFolder"
+            templateDir = "$openapiInputFolder/template"
             outputDir = "$generatedOpenapiFilesPath"
-            modelPackage = "ru.craftysoft.orderingsystem.gateway.rest.model"
-            apiPackage = "ru.craftysoft.orderingsystem.gateway.controller"
+            modelPackage = "ru.craftysoft.orderingsystem.gateway.order.rest.model"
+            apiPackage = "ru.craftysoft.orderingsystem.gateway.order.controller"
             generateModelTests = false
             configOptions = [
                     openApiNullable: "false",

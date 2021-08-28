@@ -1,9 +1,7 @@
 package ru.craftysoft.orderingsystem.gateway.service.grpc;
 
 import io.grpc.stub.StreamObserver;
-import ru.craftysoft.orderingsystem.user.proto.GetRolesRequest;
-import ru.craftysoft.orderingsystem.user.proto.GetRolesResponse;
-import ru.craftysoft.orderingsystem.user.proto.UserServiceGrpc;
+import ru.craftysoft.orderingsystem.user.proto.*;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -26,6 +24,29 @@ public class UserServiceClient {
 
             @Override
             public void onNext(GetRolesResponse response) {
+                this.response = response;
+            }
+
+            @Override
+            public void onError(Throwable throwable) {
+                result.completeExceptionally(throwable);
+            }
+
+            @Override
+            public void onCompleted() {
+                result.complete(this.response);
+            }
+        });
+        return result;
+    }
+
+    public CompletableFuture<GetUserIdResponse> getUserId(GetUserIdRequest request) {
+        var result = new CompletableFuture<GetUserIdResponse>();
+        userServiceStub.getUserId(request, new StreamObserver<>() {
+            private GetUserIdResponse response;
+
+            @Override
+            public void onNext(GetUserIdResponse response) {
                 this.response = response;
             }
 

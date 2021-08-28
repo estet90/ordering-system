@@ -1,13 +1,14 @@
 package ru.craftysoft.orderingsystem.gateway.logic;
 
-import ru.craftysoft.orderingsystem.gateway.rest.model.Order;
+import ru.craftysoft.orderingsystem.gateway.order.rest.model.Order;
 import ru.craftysoft.orderingsystem.gateway.service.grpc.OrderServiceClientAdapter;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+
+import static ru.craftysoft.orderingsystem.util.proto.ProtoUtils.moneyToBigDecimal;
 
 @Singleton
 public class GetOrdersOperation {
@@ -29,7 +30,7 @@ public class GetOrdersOperation {
                                 var resultOrder = new Order();
                                 resultOrder.setId(order.getId());
                                 resultOrder.setName(order.getName());
-                                resultOrder.setPrice(BigDecimal.valueOf(order.getPrice()));
+                                resultOrder.setPrice(moneyToBigDecimal(order.getPrice()));
                                 resultOrder.setCustomerId(order.getCustomerId());
                                 return resultOrder;
                             }

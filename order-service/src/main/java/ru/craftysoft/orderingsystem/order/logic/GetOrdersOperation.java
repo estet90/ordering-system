@@ -5,16 +5,14 @@ import lombok.extern.slf4j.Slf4j;
 import ru.craftysoft.orderingsystem.order.proto.GetOrdersRequest;
 import ru.craftysoft.orderingsystem.order.proto.GetOrdersResponse;
 import ru.craftysoft.orderingsystem.order.proto.GetOrdersResponseData;
-import ru.craftysoft.orderingsystem.order.proto.Order;
 import ru.craftysoft.orderingsystem.order.service.dao.OrderDaoAdapter;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.BiFunction;
 
 import static ru.craftysoft.orderingsystem.util.mdc.MdcUtils.withContext;
+import static ru.craftysoft.orderingsystem.util.proto.ProtoUtils.bigDecimalToMoney;
 
 @Singleton
 @Slf4j
@@ -39,10 +37,10 @@ public class GetOrdersOperation {
                     return GetOrdersResponse.newBuilder()
                             .setGetOrdersResponseData(GetOrdersResponseData.newBuilder()
                                     .addAllOrders(orders.stream()
-                                            .map(order -> Order.newBuilder()
+                                            .map(order -> GetOrdersResponseData.Order.newBuilder()
                                                     .setId(order.id())
                                                     .setName(order.name())
-                                                    .setPrice(order.price().floatValue())
+                                                    .setPrice(bigDecimalToMoney(order.price()))
                                                     .setCustomerId(order.customerId())
                                                     .build()
                                             )

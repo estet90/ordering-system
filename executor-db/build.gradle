@@ -1,0 +1,27 @@
+import liquibase.integration.commandline.LiquibaseCommandLine
+
+buildscript {
+    dependencies {
+        classpath "org.liquibase:liquibase-core:$liquibaseVersion"
+        classpath "info.picocli:picocli:$picocliVersion"
+        classpath "org.postgresql:postgresql:$postgresqlVersion"
+    }
+    repositories {
+        mavenLocal()
+        mavenCentral()
+    }
+}
+
+task migrate() {
+    String[] args = [
+            "--driver=org.postgresql.Driver",
+            "--username=$dbUsername",
+            "--password=$dbPassword",
+            "--url=$dbUrl",
+            "--changeLogFile=/src/main/resources/db/migration/executors-changelog.xml",
+            "--liquibaseSchemaName=executors",
+            "--classpath=$projectDir/",
+            "migrate"
+    ]
+    new LiquibaseCommandLine().execute(args)
+}
