@@ -79,7 +79,7 @@ public class RedisClientAdapter {
                                     connection, decreaseCustomerAmountStream, UuidUtils.generateDefaultUuid(), request,
                                     AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
                             )
-                            .whenComplete(withMdc((requests, throwable) -> {
+                            .thenAccept(withMdc((requests) -> {
                                 redisPool.release(connection);
                             }));
                 }));
@@ -94,7 +94,7 @@ public class RedisClientAdapter {
                                     connection, incrementExecutorAmountStream, entry.getKey(), request,
                                     AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
                             )
-                            .whenComplete(withMdc((requests, throwable) -> {
+                            .thenAccept(withMdc((requests) -> {
                                 redisPool.release(connection);
                             }));
                 }));
@@ -108,7 +108,7 @@ public class RedisClientAdapter {
                                     connection, reserveOrderStream, entry.getKey(), request,
                                     AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
                             )
-                            .whenComplete(withMdc((requests, throwable) -> {
+                            .thenAccept(withMdc((requests) -> {
                                 redisPool.release(connection);
                             }));
                 }));
@@ -122,7 +122,7 @@ public class RedisClientAdapter {
                                     connection, incrementCustomerAmountStream, entry.getKey(), request,
                                     AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
                             )
-                            .whenComplete(withMdc((requests, throwable) -> {
+                            .thenAccept(withMdc((requests) -> {
                                 redisPool.release(connection);
                             }));
                 }));
@@ -136,7 +136,7 @@ public class RedisClientAdapter {
                                     connection, incrementCustomerAmountStream, entry.getKey(), request,
                                     AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
                             )
-                            .whenComplete(withMdc((requests, throwable) -> {
+                            .thenAccept(withMdc((requests) -> {
                                 redisPool.release(connection);
                             }));
                 }));
@@ -150,7 +150,7 @@ public class RedisClientAdapter {
                                     connection, decreaseExecutorAmountStream, entry.getKey(), request,
                                     AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
                             )
-                            .whenComplete(withMdc((requests, throwable) -> {
+                            .thenAccept(withMdc((requests) -> {
                                 redisPool.release(connection);
                             }));
                 }));
@@ -164,7 +164,7 @@ public class RedisClientAdapter {
                                     connection, completeOrderStream, entry.getKey(), request,
                                     AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
                             )
-                            .whenComplete(withMdc((requests, throwable) -> {
+                            .thenAccept(withMdc((requests) -> {
                                 redisPool.release(connection);
                             }));
                 }));
@@ -178,7 +178,7 @@ public class RedisClientAdapter {
                                     connection, reserveOrderStream, entry.getKey(), request,
                                     AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
                             )
-                            .whenComplete(withMdc((requests, throwable) -> {
+                            .thenAccept(withMdc((requests) -> {
                                 redisPool.release(connection);
                             }));
                 }));
@@ -277,9 +277,12 @@ public class RedisClientAdapter {
                     if (counter < maxRetryCounter) {
                         var newRequest = decreaseCustomerAmountRequestBuilder.build(request, counter);
                         client.sendMessage(
-                                connection, decreaseCustomerAmountStream, entry.getKey(), newRequest,
-                                AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
-                        );
+                                        connection, decreaseCustomerAmountStream, entry.getKey(), newRequest,
+                                        AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
+                                )
+                                .thenAccept(withMdc((requests) -> {
+                                    redisPool.release(connection);
+                                }));
                     } else {
                         throw new RetryExpiryException(throwable);
                     }
@@ -295,9 +298,12 @@ public class RedisClientAdapter {
                     if (counter < maxRetryCounter) {
                         var newRequest = incrementExecutorAmountRequestBuilder.build(request, counter);
                         client.sendMessage(
-                                connection, decreaseExecutorAmountStream, entry.getKey(), newRequest,
-                                AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
-                        );
+                                        connection, decreaseExecutorAmountStream, entry.getKey(), newRequest,
+                                        AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
+                                )
+                                .thenAccept(withMdc((requests) -> {
+                                    redisPool.release(connection);
+                                }));
                     } else {
                         throw new RetryExpiryException(throwable);
                     }
@@ -313,9 +319,12 @@ public class RedisClientAdapter {
                     if (counter < maxRetryCounter) {
                         var newRequest = reserveOrderRequestBuilder.build(request, counter);
                         client.sendMessage(
-                                connection, reserveOrderStream, entry.getKey(), newRequest,
-                                AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
-                        );
+                                        connection, reserveOrderStream, entry.getKey(), newRequest,
+                                        AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
+                                )
+                                .thenAccept(withMdc((requests) -> {
+                                    redisPool.release(connection);
+                                }));
                     } else {
                         throw new RetryExpiryException(throwable);
                     }
@@ -331,9 +340,12 @@ public class RedisClientAdapter {
                     if (counter < maxRetryCounter) {
                         var newRequest = completeOrderRequestBuilder.build(request, counter);
                         client.sendMessage(
-                                connection, completeOrderStream, entry.getKey(), newRequest,
-                                AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
-                        );
+                                        connection, completeOrderStream, entry.getKey(), newRequest,
+                                        AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
+                                )
+                                .thenAccept(withMdc((requests) -> {
+                                    redisPool.release(connection);
+                                }));
                     } else {
                         throw new RetryExpiryException(throwable);
                     }
@@ -348,9 +360,12 @@ public class RedisClientAdapter {
                     if (counter < maxRetryCounter) {
                         var newRequest = decreaseExecutorAmountRequestBuilder.build(request, counter);
                         client.sendMessage(
-                                connection, decreaseExecutorAmountStream, entry.getKey(), newRequest,
-                                AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
-                        );
+                                        connection, decreaseExecutorAmountStream, entry.getKey(), newRequest,
+                                        AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
+                                )
+                                .thenAccept(withMdc((requests) -> {
+                                    redisPool.release(connection);
+                                }));
                     } else {
                         throw new RetryExpiryException(throwable);
                     }
@@ -365,9 +380,12 @@ public class RedisClientAdapter {
                     if (counter < maxRetryCounter) {
                         var newRequest = incrementCustomerAmountRequestBuilder.build(request, counter);
                         client.sendMessage(
-                                connection, incrementCustomerAmountStream, entry.getKey(), newRequest,
-                                AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
-                        );
+                                        connection, incrementCustomerAmountStream, entry.getKey(), newRequest,
+                                        AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
+                                )
+                                .thenAccept(withMdc((requests) -> {
+                                    redisPool.release(connection);
+                                }));
                     } else {
                         throw new RetryExpiryException(throwable);
                     }
