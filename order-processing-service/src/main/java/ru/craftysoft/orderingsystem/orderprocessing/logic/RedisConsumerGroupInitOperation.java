@@ -2,29 +2,29 @@ package ru.craftysoft.orderingsystem.orderprocessing.logic;
 
 import io.lettuce.core.RedisBusyException;
 import io.lettuce.core.RedisClient;
-import io.lettuce.core.RedisURI;
 import io.lettuce.core.XReadArgs;
+import io.lettuce.core.api.StatefulRedisConnection;
 import lombok.extern.slf4j.Slf4j;
 import ru.craftysoft.orderingsystem.util.properties.PropertyResolver;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.List;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 @Singleton
 @Slf4j
 public class RedisConsumerGroupInitOperation {
 
-    private final RedisClient redisClient;
-    private final String redisUrl;
+    private final Supplier<StatefulRedisConnection<String, String>> redisConnectionFactory;
     private final String consumerGroupName;
     private final List<String> streamsNames;
 
     @Inject
-    public RedisConsumerGroupInitOperation(RedisClient redisClient, PropertyResolver propertyResolver) {
-        this.redisClient = redisClient;
-        this.redisUrl = propertyResolver.getStringProperty("redis.url");
+    public RedisConsumerGroupInitOperation(Supplier<StatefulRedisConnection<String, String>> redisConnectionFactory,
+                                           PropertyResolver propertyResolver) {
+        this.redisConnectionFactory = redisConnectionFactory;
         this.consumerGroupName = propertyResolver.getStringProperty("redis.consumer.group.name");
         streamsNames = Stream
                 .of(
@@ -40,7 +40,7 @@ public class RedisConsumerGroupInitOperation {
     }
 
     public void process() {
-        try (var connection = redisClient.connect(RedisURI.create(redisUrl))) {
+        try (var connection = redisConnectionFactory.get()) {
             var commands = connection.sync();
             streamsNames.forEach(streamName -> {
                 try {

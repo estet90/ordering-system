@@ -1,7 +1,7 @@
 package ru.craftysoft.orderingsystem.orderprocessing.service.grpc;
 
-import ru.craftysoft.orderingsystem.customer.proto.UpdateCustomerBalanceRequest;
 import ru.craftysoft.orderingsystem.customer.proto.UpdateCustomerBalanceResponse;
+import ru.craftysoft.orderingsystem.orderprocessing.builder.grpc.UpdateCustomerBalanceRequestBuilder;
 import ru.craftysoft.orderingsystem.orderprocessing.proto.DecreaseCustomerAmountRequest;
 import ru.craftysoft.orderingsystem.orderprocessing.proto.IncrementCustomerAmountRequest;
 
@@ -20,17 +20,16 @@ import static ru.craftysoft.orderingsystem.util.mdc.MdcUtils.withMdc;
 public class CustomerServiceClientAdapter {
 
     private final CustomerServiceClient client;
+    private final UpdateCustomerBalanceRequestBuilder requestBuilder;
 
     @Inject
-    public CustomerServiceClientAdapter(CustomerServiceClient client) {
+    public CustomerServiceClientAdapter(CustomerServiceClient client, UpdateCustomerBalanceRequestBuilder requestBuilder) {
         this.client = client;
+        this.requestBuilder = requestBuilder;
     }
 
     public CompletableFuture<UpdateCustomerBalanceResponse> decreaseAmount(DecreaseCustomerAmountRequest decreaseCustomerAmountRequest) {
-        var request = UpdateCustomerBalanceRequest.newBuilder()
-                .setId(decreaseCustomerAmountRequest.getCustomerId())
-                .setDecreaseAmount(decreaseCustomerAmountRequest.getAmount())
-                .build();
+        var request = requestBuilder.build(decreaseCustomerAmountRequest);
         return client.updateCustomerBalance(request)
                 .thenApply(withMdc(updateCustomerBalanceResponse -> {
                     if (BALANCE_HAS_NOT_BEEN_CHANGED.equals(updateCustomerBalanceResponse.getUpdateCustomerBalanceResponseData().getResult())) {
@@ -41,10 +40,7 @@ public class CustomerServiceClientAdapter {
     }
 
     public CompletableFuture<UpdateCustomerBalanceResponse> incrementAmount(IncrementCustomerAmountRequest incrementCustomerAmountRequest) {
-        var request = UpdateCustomerBalanceRequest.newBuilder()
-                .setId(incrementCustomerAmountRequest.getCustomerId())
-                .setIncrementAmount(incrementCustomerAmountRequest.getAmount())
-                .build();
+        var request = requestBuilder.build(incrementCustomerAmountRequest);
         return client.updateCustomerBalance(request)
                 .thenApply(withMdc(updateCustomerBalanceResponse -> {
                     if (BALANCE_HAS_NOT_BEEN_CHANGED.equals(updateCustomerBalanceResponse.getUpdateCustomerBalanceResponseData().getResult())) {

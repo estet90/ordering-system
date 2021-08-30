@@ -76,9 +76,12 @@ public class RedisClientAdapter {
         return redisPool.acquire()
                 .thenAccept(withMdc(connection -> {
                     client.sendMessage(
-                            connection, decreaseCustomerAmountStream, UuidUtils.generateDefaultUuid(), request,
-                            AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
-                    );
+                                    connection, decreaseCustomerAmountStream, UuidUtils.generateDefaultUuid(), request,
+                                    AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
+                            )
+                            .whenComplete(withMdc((requests, throwable) -> {
+                                redisPool.release(connection);
+                            }));
                 }));
     }
 
@@ -88,9 +91,12 @@ public class RedisClientAdapter {
         return redisPool.acquire()
                 .thenAccept(withMdc(connection -> {
                     client.sendMessage(
-                            connection, incrementExecutorAmountStream, entry.getKey(), request,
-                            AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
-                    );
+                                    connection, incrementExecutorAmountStream, entry.getKey(), request,
+                                    AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
+                            )
+                            .whenComplete(withMdc((requests, throwable) -> {
+                                redisPool.release(connection);
+                            }));
                 }));
     }
 
@@ -99,9 +105,12 @@ public class RedisClientAdapter {
         return redisPool.acquire()
                 .thenAccept(withMdc(connection -> {
                     client.sendMessage(
-                            connection, reserveOrderStream, entry.getKey(), request,
-                            AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
-                    );
+                                    connection, reserveOrderStream, entry.getKey(), request,
+                                    AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
+                            )
+                            .whenComplete(withMdc((requests, throwable) -> {
+                                redisPool.release(connection);
+                            }));
                 }));
     }
 
@@ -110,9 +119,12 @@ public class RedisClientAdapter {
         return redisPool.acquire()
                 .thenAccept(withMdc(connection -> {
                     client.sendMessage(
-                            connection, incrementCustomerAmountStream, entry.getKey(), request,
-                            AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
-                    );
+                                    connection, incrementCustomerAmountStream, entry.getKey(), request,
+                                    AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
+                            )
+                            .whenComplete(withMdc((requests, throwable) -> {
+                                redisPool.release(connection);
+                            }));
                 }));
     }
 
@@ -121,9 +133,12 @@ public class RedisClientAdapter {
         return redisPool.acquire()
                 .thenAccept(withMdc(connection -> {
                     client.sendMessage(
-                            connection, incrementCustomerAmountStream, entry.getKey(), request,
-                            AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
-                    );
+                                    connection, incrementCustomerAmountStream, entry.getKey(), request,
+                                    AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
+                            )
+                            .whenComplete(withMdc((requests, throwable) -> {
+                                redisPool.release(connection);
+                            }));
                 }));
     }
 
@@ -132,9 +147,12 @@ public class RedisClientAdapter {
         return redisPool.acquire()
                 .thenAccept(withMdc(connection -> {
                     client.sendMessage(
-                            connection, decreaseExecutorAmountStream, entry.getKey(), request,
-                            AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
-                    );
+                                    connection, decreaseExecutorAmountStream, entry.getKey(), request,
+                                    AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
+                            )
+                            .whenComplete(withMdc((requests, throwable) -> {
+                                redisPool.release(connection);
+                            }));
                 }));
     }
 
@@ -143,9 +161,12 @@ public class RedisClientAdapter {
         return redisPool.acquire()
                 .thenAccept(withMdc(connection -> {
                     client.sendMessage(
-                            connection, completeOrderStream, entry.getKey(), request,
-                            AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
-                    );
+                                    connection, completeOrderStream, entry.getKey(), request,
+                                    AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
+                            )
+                            .whenComplete(withMdc((requests, throwable) -> {
+                                redisPool.release(connection);
+                            }));
                 }));
     }
 
@@ -154,9 +175,12 @@ public class RedisClientAdapter {
         return redisPool.acquire()
                 .thenAccept(withMdc(connection -> {
                     client.sendMessage(
-                            connection, reserveOrderStream, entry.getKey(), request,
-                            AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
-                    );
+                                    connection, reserveOrderStream, entry.getKey(), request,
+                                    AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
+                            )
+                            .whenComplete(withMdc((requests, throwable) -> {
+                                redisPool.release(connection);
+                            }));
                 }));
     }
 

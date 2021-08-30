@@ -19,6 +19,23 @@ dependencies {
         testAnnotationProcessor(it)
     }
     protobuf files("src/main/resources/proto")
+    testImplementation(
+            "org.junit.jupiter:junit-jupiter:$junitVersion",
+            "org.assertj:assertj-core:3.20.2",
+            'org.mockito:mockito-core:3.12.1',
+
+            "org.testcontainers:postgresql:$testcontainersPostgresqlVersion",
+            "com.redislabs:testcontainers-redis:$testcontainersRedisVersion",
+            "org.liquibase:liquibase-core:$liquibaseVersion",
+            "org.postgresql:postgresql:$postgresqlVersion",
+
+            "org.projectlombok:lombok:$lombokVersion"
+    )
+    testImplementation project(":user-db")
+    testImplementation project(":order-db")
+    testImplementation project(":executor-db")
+    testImplementation project(":customer-db")
+    testAnnotationProcessor("org.projectlombok:lombok:$lombokVersion")
 }
 
 String generatedProtoFilesPath = "${projectDir}/build/generated/sources/proto"
@@ -38,3 +55,13 @@ sourceSets.main.java {
 }
 
 application.getMainClass().set("ru.craftysoft.orderingsystem.orderprocessing.Application")
+
+test {
+    useJUnitPlatform {
+        excludeEngines "junit-vintage"
+    }
+    testLogging {
+        events "passed", "skipped", "failed"
+        exceptionFormat "full"
+    }
+}

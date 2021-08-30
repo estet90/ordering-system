@@ -18,9 +18,17 @@ import javax.inject.Singleton;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 
 @Module
 public class RedisModule {
+
+    @Provides
+    @Singleton
+    static Supplier<StatefulRedisConnection<String, String>> redisConnectionFactory(RedisClient redisClient, PropertyResolver propertyResolver) {
+        var redisUrl = propertyResolver.getStringProperty("redis.url");
+        return () -> redisClient.connect(RedisURI.create(redisUrl));
+    }
 
     @Provides
     @Singleton

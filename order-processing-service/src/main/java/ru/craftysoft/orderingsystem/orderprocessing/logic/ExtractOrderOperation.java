@@ -9,6 +9,7 @@ import ru.craftysoft.orderingsystem.util.uuid.UuidUtils;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 import static ru.craftysoft.orderingsystem.orderprocessing.error.operation.ModuleOperationCode.EXTRACT_ORDER;
 import static ru.craftysoft.orderingsystem.util.error.logging.ExceptionLoggerHelper.logError;
@@ -34,7 +35,7 @@ public class ExtractOrderOperation {
         this.orderDaoAdapter = orderDaoAdapter;
     }
 
-    public void process() {
+    public CompletableFuture<Void> process() {
         MDC.setContextMap(Map.of(
                 TRACE_ID, UuidUtils.generateDefaultUuid(),
                 SPAN_ID, UuidUtils.generateDefaultUuid(),
@@ -43,20 +44,23 @@ public class ExtractOrderOperation {
         log.info("{}.in", point);
         try {
             var orders = orderDaoAdapter.processOrders();
-            orders.forEach(order -> redisClientAdapter.sendMessagesToDecreaseCustomerAmountStream(order)
-                    .whenComplete(withMdc((unused, throwable) -> {
-                        if (throwable != null) {
-                            logError(log, point + ".processOrder", throwable);
-                            try {
-                                orderDaoAdapter.reserveOrder(order);
-                            } catch (Exception e) {
-                                logError(log, point + ".reserveOrder", e);
-                            }
-                        }
-                    })));
+            var futures = orders.stream().map(order -> redisClientAdapter.sendMessagesToDecreaseCustomerAmountStream(order)
+                            .whenComplete(withMdc((unused, throwable) -> {
+                                if (throwable != null) {
+                                    logError(log, point + ".processOrder", throwable);
+                                    try {
+                                        orderDaoAdapter.reserveOrder(order);
+                                    } catch (Exception e) {
+                                        logError(log, point + ".reserveOrder", e);
+                                    }
+                                }
+                            })))
+                    .toArray(value -> new CompletableFuture[orders.size()]);
             log.info("{}.out", point);
+            return CompletableFuture.allOf(futures);
         } catch (Exception e) {
             logError(log, point, e);
+            throw new RuntimeException(e);
         } finally {
             MDC.clear();
         }

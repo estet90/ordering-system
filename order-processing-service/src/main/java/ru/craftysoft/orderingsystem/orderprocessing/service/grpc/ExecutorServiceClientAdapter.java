@@ -1,15 +1,11 @@
 package ru.craftysoft.orderingsystem.orderprocessing.service.grpc;
 
-import ru.craftysoft.orderingsystem.executor.proto.UpdateExecutorBalanceRequest;
-import ru.craftysoft.orderingsystem.executor.proto.UpdateExecutorBalanceResponse;
+import ru.craftysoft.orderingsystem.orderprocessing.builder.grpc.UpdateExecutorBalanceResponse;
 import ru.craftysoft.orderingsystem.orderprocessing.proto.DecreaseExecutorAmountRequest;
 import ru.craftysoft.orderingsystem.orderprocessing.proto.IncrementExecutorAmountRequest;
-import ru.craftysoft.orderingsystem.util.properties.PropertyResolver;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.concurrent.CompletableFuture;
 
 import static ru.craftysoft.orderingsystem.executor.proto.UpdateExecutorBalanceResponseData.Result.BALANCE_HAS_NOT_BEEN_CHANGED;
@@ -18,29 +14,21 @@ import static ru.craftysoft.orderingsystem.orderprocessing.error.exception.Busin
 import static ru.craftysoft.orderingsystem.orderprocessing.error.operation.ModuleOperationCode.resolve;
 import static ru.craftysoft.orderingsystem.util.error.exception.ExceptionFactory.newBusinessException;
 import static ru.craftysoft.orderingsystem.util.mdc.MdcUtils.withMdc;
-import static ru.craftysoft.orderingsystem.util.proto.ProtoUtils.bigDecimalToMoney;
-import static ru.craftysoft.orderingsystem.util.proto.ProtoUtils.moneyToBigDecimal;
 
 @Singleton
 public class ExecutorServiceClientAdapter {
 
     private final ExecutorServiceClient client;
-    private final BigDecimal executorFeePart;
+    private final UpdateExecutorBalanceResponse requestBuilder;
 
     @Inject
-    public ExecutorServiceClientAdapter(ExecutorServiceClient client, PropertyResolver propertyResolver) {
+    public ExecutorServiceClientAdapter(ExecutorServiceClient client, UpdateExecutorBalanceResponse requestBuilder) {
         this.client = client;
-        var commission = propertyResolver.getIntProperty("commission.percent");
-        this.executorFeePart = (BigDecimal.valueOf(100).subtract(BigDecimal.valueOf(commission)))
-                .divide(BigDecimal.valueOf(100), RoundingMode.HALF_DOWN);
+        this.requestBuilder = requestBuilder;
     }
 
-    public CompletableFuture<UpdateExecutorBalanceResponse> incrementAmount(IncrementExecutorAmountRequest incrementExecutorAmountRequest) {
-        var fee = bigDecimalToMoney(moneyToBigDecimal(incrementExecutorAmountRequest.getAmount()).multiply(executorFeePart));
-        var request = UpdateExecutorBalanceRequest.newBuilder()
-                .setId(incrementExecutorAmountRequest.getCustomerId())
-                .setIncrementAmount(fee)
-                .build();
+    public CompletableFuture<ru.craftysoft.orderingsystem.executor.proto.UpdateExecutorBalanceResponse> incrementAmount(IncrementExecutorAmountRequest incrementExecutorAmountRequest) {
+        var request = requestBuilder.build(incrementExecutorAmountRequest);
         return client.updateExecutorBalance(request)
                 .thenApply(withMdc((updateExecutorBalanceResponse) -> {
                     if (BALANCE_HAS_NOT_BEEN_CHANGED.equals(updateExecutorBalanceResponse.getUpdateExecutorBalanceResponseData().getResult())) {
@@ -50,12 +38,8 @@ public class ExecutorServiceClientAdapter {
                 }));
     }
 
-    public CompletableFuture<UpdateExecutorBalanceResponse> decreaseAmount(DecreaseExecutorAmountRequest decreaseExecutorAmountRequest) {
-        var fee = bigDecimalToMoney(moneyToBigDecimal(decreaseExecutorAmountRequest.getAmount()).multiply(executorFeePart));
-        var request = UpdateExecutorBalanceRequest.newBuilder()
-                .setId(decreaseExecutorAmountRequest.getCustomerId())
-                .setDecreaseAmount(fee)
-                .build();
+    public CompletableFuture<ru.craftysoft.orderingsystem.executor.proto.UpdateExecutorBalanceResponse> decreaseAmount(DecreaseExecutorAmountRequest decreaseExecutorAmountRequest) {
+        var request = requestBuilder.build(decreaseExecutorAmountRequest);
         return client.updateExecutorBalance(request)
                 .thenApply(withMdc((updateExecutorBalanceResponse) -> {
                     if (BALANCE_HAS_NOT_BEEN_CHANGED.equals(updateExecutorBalanceResponse.getUpdateExecutorBalanceResponseData().getResult())) {
