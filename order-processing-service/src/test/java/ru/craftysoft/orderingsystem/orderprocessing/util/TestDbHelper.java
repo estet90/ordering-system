@@ -10,9 +10,6 @@ import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Objects;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -20,10 +17,10 @@ import java.util.stream.Collectors;
 import static lombok.AccessLevel.PRIVATE;
 
 @NoArgsConstructor(access = PRIVATE)
-public class DbHelper {
+public class TestDbHelper {
 
     public static void executeQueryFromClasspath(Supplier<Connection> connectionFactory, String path) {
-        try (var inputStream = DbHelper.class.getClassLoader().getResourceAsStream(path);
+        try (var inputStream = TestDbHelper.class.getClassLoader().getResourceAsStream(path);
              var reader = new InputStreamReader(Objects.requireNonNull(inputStream), StandardCharsets.UTF_8);
              var bufferedReader = new BufferedReader(reader)) {
             var sql = bufferedReader.lines()
@@ -44,25 +41,6 @@ public class DbHelper {
             }
         }
     }
-
-    public static List<Object> executeQueryWithReturning(Supplier<Connection> connectionFactory, String... queries) {
-        List<Object> idList = new ArrayList<>();
-        for (var query : queries) {
-            try (var connection = connectionFactory.get();
-                 var preparedStatement = connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)) {
-                preparedStatement.executeUpdate();
-                try (var resultSet = preparedStatement.getGeneratedKeys()) {
-                    if (resultSet.next()) {
-                        idList.add(resultSet.getObject("id"));
-                    }
-                }
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            }
-        }
-        return idList;
-    }
-
 
     @SneakyThrows
     public static Connection getConnection(String url, String username, String password) {
