@@ -44,6 +44,10 @@ public class SecurityRequestFilter implements ContainerRequestFilter {
     public void filter(ContainerRequestContext requestContext) {
         var postMatchContainerRequestContext = (PostMatchContainerRequestContext) requestContext;
         postMatchContainerRequestContext.suspend();
+        if (requestContext.getUriInfo().getPath().contains("/swagger")) {
+            postMatchContainerRequestContext.resume();
+            return;
+        }
         var method = postMatchContainerRequestContext.getResourceMethod().getMethod();
         if (method.isAnnotationPresent(RolesAllowed.class)) {
             var authorization = requestContext.getHeaderString(AUTHORIZATION);
@@ -78,6 +82,8 @@ public class SecurityRequestFilter implements ContainerRequestFilter {
             } finally {
                 MDC.clear();
             }
+        } else {
+            postMatchContainerRequestContext.resume();
         }
     }
 }
