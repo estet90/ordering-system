@@ -1,5 +1,6 @@
 plugins {
     id "com.google.protobuf" version "$protobufGradleOluginVersion"
+    id "application"
 }
 
 dependencies {
@@ -35,3 +36,5 @@ sourceSets.main.java {
             "${generatedProtoFilesPath}/main/grpc",
     )
 }
+
+application.getMainClass().set("ru.craftysoft.orderingsystem.orderprocessing.Application")

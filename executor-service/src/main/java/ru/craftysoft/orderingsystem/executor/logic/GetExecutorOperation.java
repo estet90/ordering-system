@@ -1,46 +1,42 @@
 package ru.craftysoft.orderingsystem.executor.logic;
 
-import io.grpc.Context;
 import lombok.extern.slf4j.Slf4j;
+import ru.craftysoft.orderingsystem.executor.builder.operation.GetExecutorResponseBuilder;
+import ru.craftysoft.orderingsystem.executor.error.operation.ModuleOperationCode;
 import ru.craftysoft.orderingsystem.executor.proto.GetExecutorRequest;
 import ru.craftysoft.orderingsystem.executor.proto.GetExecutorResponse;
-import ru.craftysoft.orderingsystem.executor.proto.GetExecutorResponseData;
 import ru.craftysoft.orderingsystem.executor.service.dao.ExecutorDaoAdapter;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.concurrent.CompletableFuture;
 
-import static ru.craftysoft.orderingsystem.util.mdc.MdcUtils.withContext;
-import static ru.craftysoft.orderingsystem.util.proto.ProtoUtils.bigDecimalToMoney;
+import static ru.craftysoft.orderingsystem.util.error.exception.ExceptionFactory.mapException;
+import static ru.craftysoft.orderingsystem.util.mdc.MdcUtils.withMdc;
 
 @Singleton
 @Slf4j
 public class GetExecutorOperation {
 
     private final ExecutorDaoAdapter executorDaoAdapter;
+    private final GetExecutorResponseBuilder responseBuilder;
 
     @Inject
-    public GetExecutorOperation(ExecutorDaoAdapter executorDaoAdapter) {
+    public GetExecutorOperation(ExecutorDaoAdapter executorDaoAdapter, GetExecutorResponseBuilder responseBuilder) {
         this.executorDaoAdapter = executorDaoAdapter;
+        this.responseBuilder = responseBuilder;
     }
 
     public CompletableFuture<GetExecutorResponse> process(GetExecutorRequest request) {
         log.info("GetExecutorOperation.process.in");
-        var context = Context.current();
         return executorDaoAdapter.getExecutor(request)
-                .handleAsync((executor, throwable) -> {
+                .handleAsync(withMdc((executor, throwable) -> {
                     if (throwable != null) {
-                        withContext(context, () -> log.error("GetExecutorOperation.process.thrown {}", throwable.getMessage()));
-                        throw new RuntimeException(throwable);
+                        log.error("GetExecutorOperation.process.thrown {}", throwable.getMessage());
+                        throw mapException(throwable, ModuleOperationCode::resolve);
                     }
-                    withContext(context, () -> log.info("GetExecutorOperation.process.out"));
-                    return GetExecutorResponse.newBuilder()
-                            .setGetExecutorResponseData(GetExecutorResponseData.newBuilder()
-                                    .setId(executor.id())
-                                    .setBalance(bigDecimalToMoney(executor.balance()))
-                            )
-                            .build();
-                });
+                    log.info("GetExecutorOperation.process.out");
+                    return responseBuilder.build(executor);
+                }));
     }
 }

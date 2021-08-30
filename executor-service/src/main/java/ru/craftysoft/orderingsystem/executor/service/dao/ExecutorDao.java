@@ -10,10 +10,14 @@ import javax.inject.Singleton;
 import java.math.BigDecimal;
 import java.util.List;
 
+import static ru.craftysoft.orderingsystem.executor.error.exception.InvocationExceptionCode.DB;
+import static ru.craftysoft.orderingsystem.executor.error.operation.ModuleOperationCode.resolve;
+import static ru.craftysoft.orderingsystem.util.error.exception.ExceptionFactory.mapSqlException;
+
 @Singleton
 @Slf4j
 public class ExecutorDao {
-    
+
     private final DbHelper dbHelper;
 
     @Inject
@@ -28,10 +32,16 @@ public class ExecutorDao {
                 WHERE user_id = ?""";
         return DbLoggerHelper.executeWithLogging(
                 log, "ExecutorDao.getExecutorByUserId", () -> sql, () -> userId,
-                () -> dbHelper.selectOne(sql, resultSet -> new Executor(
-                        resultSet.getLong("id"),
-                        resultSet.getBigDecimal("balance")
-                ), userId));
+                () -> {
+                    try {
+                        return dbHelper.selectOne(sql, resultSet -> new Executor(
+                                resultSet.getLong("id"),
+                                resultSet.getBigDecimal("balance")
+                        ), userId);
+                    } catch (Exception e) {
+                        throw mapSqlException(e, resolve(), DB);
+                    }
+                });
     }
 
     public Executor getExecutorById(long id) {
@@ -41,10 +51,16 @@ public class ExecutorDao {
                 WHERE id = ?""";
         return DbLoggerHelper.executeWithLogging(
                 log, "ExecutorDao.getExecutorById", () -> sql, () -> id,
-                () -> dbHelper.selectOne(sql, resultSet -> new Executor(
-                        id,
-                        resultSet.getBigDecimal("balance")
-                ), id));
+                () -> {
+                    try {
+                        return dbHelper.selectOne(sql, resultSet -> new Executor(
+                                id,
+                                resultSet.getBigDecimal("balance")
+                        ), id);
+                    } catch (Exception e) {
+                        throw mapSqlException(e, resolve(), DB);
+                    }
+                });
     }
 
     public int incrementAmount(long id, BigDecimal amount) {
@@ -54,7 +70,13 @@ public class ExecutorDao {
                 WHERE id = ?""";
         return DbLoggerHelper.executeWithLogging(
                 log, "ExecutorDao.incrementAmount", () -> sql, () -> List.of(id, amount, id),
-                () -> dbHelper.update(sql, id, amount, id)
+                () -> {
+                    try {
+                        return dbHelper.update(sql, id, amount, id);
+                    } catch (Exception e) {
+                        throw mapSqlException(e, resolve(), DB);
+                    }
+                }
         );
     }
 
@@ -65,7 +87,13 @@ public class ExecutorDao {
                 WHERE id = ? AND balance >= ?""";
         return DbLoggerHelper.executeWithLogging(
                 log, "ExecutorDao.decreaseAmount", () -> sql, () -> List.of(id, amount, id, amount),
-                () -> dbHelper.update(sql, id, amount, id, amount)
+                () -> {
+                    try {
+                        return dbHelper.update(sql, id, amount, id, amount);
+                    } catch (Exception e) {
+                        throw mapSqlException(e, resolve(), DB);
+                    }
+                }
         );
     }
 }

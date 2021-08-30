@@ -1,18 +1,47 @@
 package ru.craftysoft.orderingsystem.orderprocessing.service.grpc;
 
+import io.grpc.Metadata;
+import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
+import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import ru.craftysoft.orderingsystem.customer.proto.CustomerServiceGrpc;
 import ru.craftysoft.orderingsystem.customer.proto.UpdateCustomerBalanceRequest;
 import ru.craftysoft.orderingsystem.customer.proto.UpdateCustomerBalanceResponse;
+import ru.craftysoft.orderingsystem.util.error.exception.BaseException;
+import ru.craftysoft.orderingsystem.util.error.exception.InvocationException;
+import ru.craftysoft.orderingsystem.util.grpc.LoggingClientInterceptor;
+import ru.craftysoft.orderingsystem.util.grpc.MetadataBuilder;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
+
+import static java.util.Optional.ofNullable;
+import static ru.craftysoft.orderingsystem.orderprocessing.error.exception.InvocationExceptionCode.CUSTOMER_SERVICE;
+import static ru.craftysoft.orderingsystem.orderprocessing.error.operation.ModuleOperationCode.resolve;
+import static ru.craftysoft.orderingsystem.util.error.exception.ExceptionFactory.newInvocationException;
+import static ru.craftysoft.orderingsystem.util.error.exception.ExceptionFactory.newRetryableException;
+import static ru.craftysoft.orderingsystem.util.grpc.ExceptionHelper.*;
+import static ru.craftysoft.orderingsystem.util.mdc.MdcUtils.withMdc;
 
 @Singleton
+@Slf4j
 public class CustomerServiceClient {
 
     private final CustomerServiceGrpc.CustomerServiceStub customerServiceStub;
+    private final Metadata.Key<byte[]> updateCustomerBalanceResponseErrorKey = buildKey(UpdateCustomerBalanceResponse.class);
+    private final Function<StatusRuntimeException, UpdateCustomerBalanceResponse> errorResponseBuilder = statusRuntimeException -> extractErrorResponse(statusRuntimeException, updateCustomerBalanceResponseErrorKey, UpdateCustomerBalanceResponse::parseFrom);
+    private final Function<Throwable, InvocationException> invocationExceptionFactory = throwable -> newInvocationException(throwable, resolve(), CUSTOMER_SERVICE);
+    private final Function<Throwable, InvocationException> retryableExceptionFactory = throwable -> newRetryableException(throwable, resolve(), CUSTOMER_SERVICE);
+    private final BiConsumer<UpdateCustomerBalanceResponse, BaseException> baseExceptionFiller = (errorResponse, baseException) -> ofNullable(errorResponse)
+            .filter(UpdateCustomerBalanceResponse::hasError)
+            .map(UpdateCustomerBalanceResponse::getError)
+            .ifPresent(error -> baseException
+                    .setOriginalCode(error.getCode())
+                    .setOriginalMessage(error.getMessage()));
 
     @Inject
     public CustomerServiceClient(CustomerServiceGrpc.CustomerServiceStub customerServiceStub) {
@@ -20,25 +49,35 @@ public class CustomerServiceClient {
     }
 
     public CompletableFuture<UpdateCustomerBalanceResponse> updateCustomerBalance(UpdateCustomerBalanceRequest request) {
+        var mdc = MDC.getCopyOfContextMap();
+        var metadata = MetadataBuilder.build(mdc);
         var result = new CompletableFuture<UpdateCustomerBalanceResponse>();
-        customerServiceStub.updateCustomerBalance(request, new StreamObserver<>() {
-            private UpdateCustomerBalanceResponse response;
+        customerServiceStub
+                .withInterceptors(new LoggingClientInterceptor(metadata))
+                .updateCustomerBalance(request, new StreamObserver<>() {
+                    private UpdateCustomerBalanceResponse response;
+                    private final String point = "CustomerServiceClient.updateCustomerBalance";
 
-            @Override
-            public void onNext(UpdateCustomerBalanceResponse response) {
-                this.response = response;
-            }
+                    @Override
+                    public void onNext(UpdateCustomerBalanceResponse response) {
+                        this.response = response;
+                    }
 
-            @Override
-            public void onError(Throwable throwable) {
-                result.completeExceptionally(throwable);
-            }
+                    @Override
+                    public void onError(Throwable throwable) {
+                        withMdc(mdc, () -> log.error("{}.onError.thrown {}", point, throwable.getMessage()));
+                        var baseException = mapException(
+                                log, point, mdc, throwable,
+                                errorResponseBuilder, invocationExceptionFactory, retryableExceptionFactory, baseExceptionFiller
+                        );
+                        result.completeExceptionally(baseException);
+                    }
 
-            @Override
-            public void onCompleted() {
-                result.complete(this.response);
-            }
-        });
+                    @Override
+                    public void onCompleted() {
+                        result.complete(this.response);
+                    }
+                });
         return result;
     }
 }

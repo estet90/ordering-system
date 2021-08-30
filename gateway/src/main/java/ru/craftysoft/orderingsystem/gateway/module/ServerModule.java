@@ -11,6 +11,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.jboss.resteasy.plugins.server.vertx.VertxRequestHandler;
 import org.jboss.resteasy.plugins.server.vertx.VertxResteasyDeployment;
 import ru.craftysoft.orderingsystem.gateway.controller.OrderController;
+import ru.craftysoft.orderingsystem.gateway.provider.ExceptionHandler;
+import ru.craftysoft.orderingsystem.gateway.provider.RequestLoggingFilter;
+import ru.craftysoft.orderingsystem.gateway.provider.ResponseLoggingFilter;
 import ru.craftysoft.orderingsystem.gateway.provider.SecurityRequestFilter;
 import ru.craftysoft.orderingsystem.util.properties.PropertyResolver;
 
@@ -48,13 +51,16 @@ public class ServerModule {
     @Provides
     @Singleton
     static Verticle mainVerticle(SecurityRequestFilter securityRequestFilter,
+                                 RequestLoggingFilter requestLoggingFilter,
+                                 ResponseLoggingFilter responseLoggingFilter,
+                                 ExceptionHandler exceptionHandler,
                                  PropertyResolver propertyResolver,
                                  OrderController orderController) {
         return new AbstractVerticle() {
             @Override
             public void start() {
                 var deployment = new VertxResteasyDeployment();
-                deployment.setProviders(List.of(securityRequestFilter));
+                deployment.setProviders(List.of(securityRequestFilter, requestLoggingFilter, responseLoggingFilter, exceptionHandler));
                 deployment.start();
                 var path = propertyResolver.getStringProperty("server.path");
                 deployment.getRegistry().addSingletonResource(orderController, path);

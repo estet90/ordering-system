@@ -9,6 +9,10 @@ import javax.inject.Singleton;
 import java.util.Arrays;
 import java.util.List;
 
+import static ru.craftysoft.orderingsystem.user.error.exception.InvocationExceptionCode.DB;
+import static ru.craftysoft.orderingsystem.user.error.operation.ModuleOperationCode.resolve;
+import static ru.craftysoft.orderingsystem.util.error.exception.ExceptionFactory.mapSqlException;
+
 @Singleton
 @Slf4j
 public class UserDao {
@@ -27,13 +31,19 @@ public class UserDao {
                 WHERE login = ? AND password = ?""";
         return DbLoggerHelper.executeWithLogging(
                 log, "RoleDao.getRoles", () -> sql, () -> List.of(login, password),
-                () -> dbHelper.selectOne(sql, resultSet -> {
-                    var array = resultSet.getArray("roles");
-                    if (array != null) {
-                        return Arrays.asList((String[]) array.getArray());
+                () -> {
+                    try {
+                        return dbHelper.selectOne(sql, resultSet -> {
+                            var array = resultSet.getArray("roles");
+                            if (array != null) {
+                                return Arrays.asList((String[]) array.getArray());
+                            }
+                            return List.of();
+                        }, login, password);
+                    } catch (Exception e) {
+                        throw mapSqlException(e, resolve(), DB);
                     }
-                    return List.of();
-                }, login, password)
+                }
         );
     }
 
@@ -44,7 +54,13 @@ public class UserDao {
                 WHERE login = ?""";
         return DbLoggerHelper.executeWithLogging(
                 log, "RoleDao.getUserId", () -> sql, () -> login,
-                () -> dbHelper.selectOne(sql, resultSet -> resultSet.getLong("id"), login)
+                () -> {
+                    try {
+                        return dbHelper.selectOne(sql, resultSet -> resultSet.getLong("id"), login);
+                    } catch (Exception e) {
+                        throw mapSqlException(e, resolve(), DB);
+                    }
+                }
         );
     }
 }

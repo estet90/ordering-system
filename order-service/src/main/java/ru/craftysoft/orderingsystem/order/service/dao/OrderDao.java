@@ -11,6 +11,10 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.List;
 
+import static ru.craftysoft.orderingsystem.order.error.exception.InvocationExceptionCode.DB;
+import static ru.craftysoft.orderingsystem.order.error.operation.ModuleOperationCode.resolve;
+import static ru.craftysoft.orderingsystem.util.error.exception.ExceptionFactory.mapSqlException;
+
 @Singleton
 @Slf4j
 public class OrderDao {
@@ -29,12 +33,18 @@ public class OrderDao {
                 WHERE status = ?::orders.order_status""";
         return DbLoggerHelper.executeWithLogging(
                 log, "OrderDao.getOrders", () -> sql, () -> status,
-                () -> dbHelper.select(sql, resultSet -> new Order(
-                        resultSet.getLong("id"),
-                        resultSet.getString("name"),
-                        resultSet.getBigDecimal("price"),
-                        resultSet.getLong("customer_id")
-                ), status)
+                () -> {
+                    try {
+                        return dbHelper.select(sql, resultSet -> new Order(
+                                resultSet.getLong("id"),
+                                resultSet.getString("name"),
+                                resultSet.getBigDecimal("price"),
+                                resultSet.getLong("customer_id")
+                        ), status);
+                    } catch (Exception e) {
+                        throw mapSqlException(e, resolve(), DB);
+                    }
+                }
         );
     }
 
@@ -44,7 +54,13 @@ public class OrderDao {
                 VALUES (?, ?, ?, ?::orders.order_status)""";
         return DbLoggerHelper.executeWithLogging(
                 log, "OrderDao.getOrders", () -> sql, () -> order,
-                () -> (long) dbHelper.insert(sql, order.name(), order.price(), order.customerId(), order.status())
+                () -> {
+                    try {
+                        return (long) dbHelper.insert(sql, order.name(), order.price(), order.customerId(), order.status());
+                    } catch (Exception e) {
+                        throw mapSqlException(e, resolve(), DB);
+                    }
+                }
         );
     }
 
@@ -59,7 +75,13 @@ public class OrderDao {
                 WHERE id = ? AND status = ?::orders.order_status""";
         return DbLoggerHelper.executeWithLogging(
                 log, "OrderDao.getOrders", () -> sql, () -> List.of(newStatus, executorId, id, oldStatus),
-                () -> dbHelper.update(sql, newStatus, executorId, id, oldStatus)
+                () -> {
+                    try {
+                        return dbHelper.update(sql, newStatus, executorId, id, oldStatus);
+                    } catch (Exception e) {
+                        throw mapSqlException(e, resolve(), DB);
+                    }
+                }
         );
     }
 }

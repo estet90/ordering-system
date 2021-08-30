@@ -4,14 +4,15 @@ import lombok.extern.slf4j.Slf4j;
 import ru.craftysoft.orderingsystem.customer.dto.Customer;
 import ru.craftysoft.orderingsystem.util.db.DbHelper;
 import ru.craftysoft.orderingsystem.util.db.DbLoggerHelper;
-import ru.craftysoft.orderingsystem.util.db.ResultSetExtractor;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.math.BigDecimal;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.List;
+
+import static ru.craftysoft.orderingsystem.customer.error.exception.InvocationExceptionCode.DB;
+import static ru.craftysoft.orderingsystem.customer.error.operation.ModuleOperationCode.resolve;
+import static ru.craftysoft.orderingsystem.util.error.exception.ExceptionFactory.mapSqlException;
 
 @Singleton
 @Slf4j
@@ -31,10 +32,16 @@ public class CustomerDao {
                 WHERE user_id = ?""";
         return DbLoggerHelper.executeWithLogging(
                 log, "CustomerDao.getCustomerByUserId", () -> sql, () -> userId,
-                () -> dbHelper.selectOne(sql, resultSet -> new Customer(
-                        resultSet.getLong("id"),
-                        resultSet.getBigDecimal("balance")
-                ), userId));
+                () -> {
+                    try {
+                        return dbHelper.selectOne(sql, resultSet -> new Customer(
+                                resultSet.getLong("id"),
+                                resultSet.getBigDecimal("balance")
+                        ), userId);
+                    } catch (Exception e) {
+                        throw mapSqlException(e, resolve(), DB);
+                    }
+                });
     }
 
     public Customer getCustomerById(long id) {
@@ -44,10 +51,16 @@ public class CustomerDao {
                 WHERE id = ?""";
         return DbLoggerHelper.executeWithLogging(
                 log, "CustomerDao.getCustomerById", () -> sql, () -> id,
-                () -> dbHelper.selectOne(sql, resultSet -> new Customer(
-                        id,
-                        resultSet.getBigDecimal("balance")
-                ), id));
+                () -> {
+                    try {
+                        return dbHelper.selectOne(sql, resultSet -> new Customer(
+                                id,
+                                resultSet.getBigDecimal("balance")
+                        ), id);
+                    } catch (Exception e) {
+                        throw mapSqlException(e, resolve(), DB);
+                    }
+                });
     }
 
     public BigDecimal incrementAmount(long id, BigDecimal amount) {
@@ -58,7 +71,13 @@ public class CustomerDao {
                 RETURNING balance""";
         return DbLoggerHelper.executeWithLogging(
                 log, "CustomerDao.getCustomerById", () -> sql, () -> List.of(id, amount, id),
-                () -> dbHelper.executeOne(sql, resultSet -> resultSet.getBigDecimal("balance"), id, amount, id)
+                () -> {
+                    try {
+                        return dbHelper.executeOne(sql, resultSet -> resultSet.getBigDecimal("balance"), id, amount, id);
+                    } catch (Exception e) {
+                        throw mapSqlException(e, resolve(), DB);
+                    }
+                }
         );
     }
 
@@ -70,7 +89,13 @@ public class CustomerDao {
                 RETURNING balance""";
         return DbLoggerHelper.executeWithLogging(
                 log, "CustomerDao.getCustomerById", () -> sql, () -> List.of(id, amount, id, amount),
-                () -> dbHelper.executeOne(sql, resultSet -> resultSet.getBigDecimal("balance"), id, amount, id, amount)
+                () -> {
+                    try {
+                        return dbHelper.executeOne(sql, resultSet -> resultSet.getBigDecimal("balance"), id, amount, id, amount);
+                    } catch (Exception e) {
+                        throw mapSqlException(e, resolve(), DB);
+                    }
+                }
         );
     }
 

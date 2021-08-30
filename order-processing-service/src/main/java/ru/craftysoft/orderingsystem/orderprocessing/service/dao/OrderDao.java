@@ -4,14 +4,15 @@ import lombok.extern.slf4j.Slf4j;
 import ru.craftysoft.orderingsystem.orderprocessing.dto.Order;
 import ru.craftysoft.orderingsystem.util.db.DbHelper;
 import ru.craftysoft.orderingsystem.util.db.DbLoggerHelper;
-import ru.craftysoft.orderingsystem.util.db.ResultSetExtractor;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.math.BigDecimal;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.List;
+
+import static ru.craftysoft.orderingsystem.orderprocessing.error.exception.InvocationExceptionCode.DB;
+import static ru.craftysoft.orderingsystem.orderprocessing.error.operation.ModuleOperationCode.resolve;
+import static ru.craftysoft.orderingsystem.util.error.exception.ExceptionFactory.mapSqlException;
 
 @Singleton
 @Slf4j
@@ -36,12 +37,18 @@ public class OrderDao {
                 RETURNING id, price, customer_id, executor_id""";
         return DbLoggerHelper.executeWithLogging(
                 log, "OrderDao.processOrders", () -> sql, () -> List.of(newStatus, oldStatus, limit),
-                () -> dbHelper.execute(sql, resultSet -> new Order(
-                        resultSet.getLong("id"),
-                        resultSet.getBigDecimal("price"),
-                        resultSet.getLong("customer_id"),
-                        resultSet.getLong("executor_id")
-                ), newStatus, oldStatus, limit)
+                () -> {
+                    try {
+                        return dbHelper.execute(sql, resultSet -> new Order(
+                                resultSet.getLong("id"),
+                                resultSet.getBigDecimal("price"),
+                                resultSet.getLong("customer_id"),
+                                resultSet.getLong("executor_id")
+                        ), newStatus, oldStatus, limit);
+                    } catch (Exception e) {
+                        throw mapSqlException(e, resolve(), DB);
+                    }
+                }
         );
     }
 
@@ -52,7 +59,13 @@ public class OrderDao {
                 WHERE id = ?""";
         return DbLoggerHelper.executeWithLogging(
                 log, "OrderDao.updateOrderStatus", () -> sql, () -> List.of(status, id),
-                () -> dbHelper.update(sql, status, id)
+                () -> {
+                    try {
+                        return dbHelper.update(sql, status, id);
+                    } catch (Exception e) {
+                        throw mapSqlException(e, resolve(), DB);
+                    }
+                }
         );
     }
 
@@ -62,7 +75,13 @@ public class OrderDao {
                 FROM orders.complete_order(?, ?, ?)""";
         return DbLoggerHelper.executeWithLogging(
                 log, "OrderDao.completeOrder", () -> sql, () -> List.of(id, customerId, customerBalance),
-                () -> dbHelper.executeOne(sql, resultSet -> resultSet.getInt("complete_order"), id, customerId, customerBalance)
+                () -> {
+                    try {
+                        return dbHelper.executeOne(sql, resultSet -> resultSet.getInt("complete_order"), id, customerId, customerBalance);
+                    } catch (Exception e) {
+                        throw mapSqlException(e, resolve(), DB);
+                    }
+                }
         );
     }
 }

@@ -1,6 +1,7 @@
 package ru.craftysoft.orderingsystem.orderprocessing;
 
 import dagger.Component;
+import io.grpc.ManagedChannel;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.support.BoundedAsyncPool;
@@ -15,7 +16,6 @@ import ru.craftysoft.orderingsystem.util.properties.PropertyModule;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 
 @Component(modules = {
@@ -69,5 +69,11 @@ public interface ApplicationComponent {
     IncrementExecutorAmountOperation incrementExecutorAmountOperation();
 
     ReserveOrderOperation reserveOrderOperation();
+
+    @Named("customerServiceManagedChannel")
+    ManagedChannel customerServiceManagedChannel();
+
+    @Named("executorServiceManagedChannel")
+    ManagedChannel executorServiceManagedChannel();
 
 }

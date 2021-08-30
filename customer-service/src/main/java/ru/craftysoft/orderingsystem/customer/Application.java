@@ -1,6 +1,7 @@
 package ru.craftysoft.orderingsystem.customer;
 
 import lombok.extern.slf4j.Slf4j;
+import ru.craftysoft.orderingsystem.util.error.exception.ExceptionFactory;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
@@ -9,6 +10,7 @@ import java.util.concurrent.TimeUnit;
 public class Application {
 
     public static void main(String[] args) {
+        new ExceptionFactory("003");
         var component = DaggerApplicationComponent.builder().build();
         var server = component.grpcServer();
         try {

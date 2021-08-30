@@ -1,45 +1,42 @@
 package ru.craftysoft.orderingsystem.order.logic;
 
-import io.grpc.Context;
 import lombok.extern.slf4j.Slf4j;
-import ru.craftysoft.orderingsystem.order.proto.*;
+import ru.craftysoft.orderingsystem.order.builder.operation.ReserveOrderResponseBuilder;
+import ru.craftysoft.orderingsystem.order.error.operation.ModuleOperationCode;
+import ru.craftysoft.orderingsystem.order.proto.ReserveOrderRequest;
+import ru.craftysoft.orderingsystem.order.proto.ReserveOrderResponse;
 import ru.craftysoft.orderingsystem.order.service.dao.OrderDaoAdapter;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.concurrent.CompletableFuture;
 
-import static ru.craftysoft.orderingsystem.order.proto.ReserveOrderResponseData.Result.FAILED_TO_RESERVE;
-import static ru.craftysoft.orderingsystem.order.proto.ReserveOrderResponseData.Result.RESERVED;
-import static ru.craftysoft.orderingsystem.util.mdc.MdcUtils.withContext;
+import static ru.craftysoft.orderingsystem.util.error.exception.ExceptionFactory.mapException;
+import static ru.craftysoft.orderingsystem.util.mdc.MdcUtils.withMdc;
 
 @Singleton
 @Slf4j
 public class ReserveOrderOperation {
 
     private final OrderDaoAdapter orderDaoAdapter;
+    private final ReserveOrderResponseBuilder responseBuilder;
 
     @Inject
-    public ReserveOrderOperation(OrderDaoAdapter orderDaoAdapter) {
+    public ReserveOrderOperation(OrderDaoAdapter orderDaoAdapter, ReserveOrderResponseBuilder responseBuilder) {
         this.orderDaoAdapter = orderDaoAdapter;
+        this.responseBuilder = responseBuilder;
     }
 
     public CompletableFuture<ReserveOrderResponse> process(ReserveOrderRequest request) {
         log.info("ReserveOrderOperation.process.in");
-        var context = Context.current();
         return orderDaoAdapter.reserveOrder(request)
-                .handleAsync((count, throwable) -> {
+                .handleAsync(withMdc((count, throwable) -> {
                     if (throwable != null) {
-                        withContext(context, () -> log.error("ReserveOrderOperation.process.thrown {}", throwable.getMessage()));
-                        throw new RuntimeException(throwable);
+                        log.error("ReserveOrderOperation.process.thrown {}", throwable.getMessage());
+                        throw mapException(throwable, ModuleOperationCode::resolve);
                     }
-                    withContext(context, () -> log.error("ReserveOrderOperation.process.out"));
-                    var result = count == 1
-                            ? RESERVED
-                            : FAILED_TO_RESERVE;
-                    return ReserveOrderResponse.newBuilder()
-                            .setReserveOrderResponseData(ReserveOrderResponseData.newBuilder().setResult(result))
-                            .build();
-                });
+                    log.error("ReserveOrderOperation.process.out");
+                    return responseBuilder.build(count);
+                }));
     }
 }

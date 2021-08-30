@@ -13,6 +13,7 @@ public class MdcKey {
     public static final String SPAN_ID = "spanId";
     public static final String PARENT_ID = "parentId";
 
+    public static final Context.Key<String> OPERATION_NAME_KEY = Context.key(OPERATION_NAME);
     public static final Context.Key<String> TRACE_ID_KEY = Context.key(TRACE_ID);
     public static final Context.Key<String> SPAN_ID_KEY = Context.key(SPAN_ID);
     public static final Context.Key<String> PARENT_ID_KEY = Context.key(PARENT_ID);

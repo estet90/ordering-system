@@ -1,11 +1,19 @@
 package ru.craftysoft.orderingsystem.orderprocessing.logic;
 
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import ru.craftysoft.orderingsystem.orderprocessing.service.dao.OrderDaoAdapter;
 import ru.craftysoft.orderingsystem.orderprocessing.service.redis.RedisClientAdapter;
+import ru.craftysoft.orderingsystem.util.uuid.UuidUtils;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import java.util.Map;
+
+import static ru.craftysoft.orderingsystem.orderprocessing.error.operation.ModuleOperationCode.EXTRACT_ORDER;
+import static ru.craftysoft.orderingsystem.util.error.logging.ExceptionLoggerHelper.logError;
+import static ru.craftysoft.orderingsystem.util.mdc.MdcKey.*;
+import static ru.craftysoft.orderingsystem.util.mdc.MdcUtils.withMdc;
 
 /**
  * из БД извлекаются зарезервированные заявки и передаются в работу.
@@ -18,6 +26,7 @@ public class ExtractOrderOperation {
 
     private final RedisClientAdapter redisClientAdapter;
     private final OrderDaoAdapter orderDaoAdapter;
+    private final String point = "ExtractOrderOperation.process";
 
     @Inject
     public ExtractOrderOperation(RedisClientAdapter redisClientAdapter, OrderDaoAdapter orderDaoAdapter) {
@@ -26,23 +35,30 @@ public class ExtractOrderOperation {
     }
 
     public void process() {
-        log.info("ExtractOrderOperation.process.in");
+        MDC.setContextMap(Map.of(
+                TRACE_ID, UuidUtils.generateDefaultUuid(),
+                SPAN_ID, UuidUtils.generateDefaultUuid(),
+                OPERATION_NAME, EXTRACT_ORDER.name()
+        ));
+        log.info("{}.in", point);
         try {
             var orders = orderDaoAdapter.processOrders();
             orders.forEach(order -> redisClientAdapter.sendMessagesToDecreaseCustomerAmountStream(order)
-                    .whenComplete((unused, throwable) -> {
+                    .whenComplete(withMdc((unused, throwable) -> {
                         if (throwable != null) {
-                            log.error("ExtractOrderOperation.process.processOrder.thrown order={}", order, throwable);
+                            logError(log, point + ".processOrder", throwable);
                             try {
                                 orderDaoAdapter.reserveOrder(order);
                             } catch (Exception e) {
-                                log.error("ExtractOrderOperation.process.reserveOrder.thrown", e);
+                                logError(log, point + ".reserveOrder", e);
                             }
                         }
-                    }));
-            log.info("ExtractOrderOperation.process.out");
+                    })));
+            log.info("{}.out", point);
         } catch (Exception e) {
-            log.error("ExtractOrderOperation.process.thrown", e);
+            logError(log, point, e);
+        } finally {
+            MDC.clear();
         }
     }
 }

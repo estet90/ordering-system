@@ -1,56 +1,42 @@
 package ru.craftysoft.orderingsystem.customer.logic;
 
-import com.google.type.Money;
-import io.grpc.Context;
 import lombok.extern.slf4j.Slf4j;
+import ru.craftysoft.orderingsystem.customer.builder.operation.UpdateCustomerBalanceResponseBuilder;
+import ru.craftysoft.orderingsystem.customer.error.operation.ModuleOperationCode;
 import ru.craftysoft.orderingsystem.customer.proto.UpdateCustomerBalanceRequest;
 import ru.craftysoft.orderingsystem.customer.proto.UpdateCustomerBalanceResponse;
-import ru.craftysoft.orderingsystem.customer.proto.UpdateCustomerBalanceResponseData;
 import ru.craftysoft.orderingsystem.customer.service.dao.CustomerDaoAdapter;
-import ru.craftysoft.orderingsystem.util.proto.ProtoUtils;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.concurrent.CompletableFuture;
 
-import static java.util.Optional.ofNullable;
-import static ru.craftysoft.orderingsystem.customer.proto.UpdateCustomerBalanceResponseData.Result.BALANCE_HAS_BEEN_CHANGED;
-import static ru.craftysoft.orderingsystem.customer.proto.UpdateCustomerBalanceResponseData.Result.BALANCE_HAS_NOT_BEEN_CHANGED;
-import static ru.craftysoft.orderingsystem.util.mdc.MdcUtils.withContext;
+import static ru.craftysoft.orderingsystem.util.error.exception.ExceptionFactory.mapException;
+import static ru.craftysoft.orderingsystem.util.mdc.MdcUtils.withMdc;
 
 @Singleton
 @Slf4j
 public class UpdateCustomerBalanceOperation {
 
     private final CustomerDaoAdapter customerDaoAdapter;
+    private final UpdateCustomerBalanceResponseBuilder responseBuilder;
 
     @Inject
-    public UpdateCustomerBalanceOperation(CustomerDaoAdapter customerDaoAdapter) {
+    public UpdateCustomerBalanceOperation(CustomerDaoAdapter customerDaoAdapter, UpdateCustomerBalanceResponseBuilder responseBuilder) {
         this.customerDaoAdapter = customerDaoAdapter;
+        this.responseBuilder = responseBuilder;
     }
 
     public CompletableFuture<UpdateCustomerBalanceResponse> process(UpdateCustomerBalanceRequest request) {
         log.info("UpdateCustomerBalanceOperation.process.in");
-        var context = Context.current();
         return customerDaoAdapter.updateCustomerBalance(request)
-                .handleAsync((balance, throwable) -> {
+                .handleAsync(withMdc((balance, throwable) -> {
                     if (throwable != null) {
-                        withContext(context, () -> log.error("UpdateCustomerBalanceOperation.process.thrown {}", throwable.getMessage()));
-                        throw new RuntimeException(throwable);
+                        log.error("UpdateCustomerBalanceOperation.process.thrown {}", throwable.getMessage());
+                        throw mapException(throwable, ModuleOperationCode::resolve);
                     }
-                    withContext(context, () -> log.error("UpdateCustomerBalanceOperation.process.out"));
-                    var result = balance != null
-                            ? BALANCE_HAS_BEEN_CHANGED
-                            : BALANCE_HAS_NOT_BEEN_CHANGED;
-                    var balanceAsMoney = ofNullable(balance)
-                            .map(ProtoUtils::bigDecimalToMoney)
-                            .orElseGet(Money::getDefaultInstance);
-                    return UpdateCustomerBalanceResponse.newBuilder()
-                            .setUpdateCustomerBalanceResponseData(UpdateCustomerBalanceResponseData.newBuilder()
-                                    .setBalance(balanceAsMoney)
-                                    .setResult(result)
-                            )
-                            .build();
-                });
+                    log.error("UpdateCustomerBalanceOperation.process.out");
+                    return responseBuilder.build(balance);
+                }));
     }
 }

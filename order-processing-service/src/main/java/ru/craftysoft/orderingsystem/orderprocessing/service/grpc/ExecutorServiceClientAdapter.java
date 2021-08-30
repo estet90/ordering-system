@@ -13,6 +13,11 @@ import java.math.RoundingMode;
 import java.util.concurrent.CompletableFuture;
 
 import static ru.craftysoft.orderingsystem.executor.proto.UpdateExecutorBalanceResponseData.Result.BALANCE_HAS_NOT_BEEN_CHANGED;
+import static ru.craftysoft.orderingsystem.orderprocessing.error.exception.BusinessExceptionCode.EXECUTOR_BALANCE_HAS_NOT_BEEN_DECREASED;
+import static ru.craftysoft.orderingsystem.orderprocessing.error.exception.BusinessExceptionCode.EXECUTOR_BALANCE_HAS_NOT_BEEN_INCREMENTED;
+import static ru.craftysoft.orderingsystem.orderprocessing.error.operation.ModuleOperationCode.resolve;
+import static ru.craftysoft.orderingsystem.util.error.exception.ExceptionFactory.newBusinessException;
+import static ru.craftysoft.orderingsystem.util.mdc.MdcUtils.withMdc;
 import static ru.craftysoft.orderingsystem.util.proto.ProtoUtils.bigDecimalToMoney;
 import static ru.craftysoft.orderingsystem.util.proto.ProtoUtils.moneyToBigDecimal;
 
@@ -37,14 +42,12 @@ public class ExecutorServiceClientAdapter {
                 .setIncrementAmount(fee)
                 .build();
         return client.updateExecutorBalance(request)
-                .whenComplete((updateExecutorBalanceResponse, throwable) -> {
-                    if (throwable != null) {
-                        throw new RuntimeException(throwable);
-                    }
+                .thenApply(withMdc((updateExecutorBalanceResponse) -> {
                     if (BALANCE_HAS_NOT_BEEN_CHANGED.equals(updateExecutorBalanceResponse.getUpdateExecutorBalanceResponseData().getResult())) {
-                        throw new RuntimeException();
+                        throw newBusinessException(resolve(), EXECUTOR_BALANCE_HAS_NOT_BEEN_INCREMENTED);
                     }
-                });
+                    return updateExecutorBalanceResponse;
+                }));
     }
 
     public CompletableFuture<UpdateExecutorBalanceResponse> decreaseAmount(DecreaseExecutorAmountRequest decreaseExecutorAmountRequest) {
@@ -54,13 +57,11 @@ public class ExecutorServiceClientAdapter {
                 .setDecreaseAmount(fee)
                 .build();
         return client.updateExecutorBalance(request)
-                .whenComplete((updateExecutorBalanceResponse, throwable) -> {
-                    if (throwable != null) {
-                        throw new RuntimeException(throwable);
-                    }
+                .thenApply(withMdc((updateExecutorBalanceResponse) -> {
                     if (BALANCE_HAS_NOT_BEEN_CHANGED.equals(updateExecutorBalanceResponse.getUpdateExecutorBalanceResponseData().getResult())) {
-                        throw new RuntimeException();
+                        throw newBusinessException(resolve(), EXECUTOR_BALANCE_HAS_NOT_BEEN_DECREASED);
                     }
-                });
+                    return updateExecutorBalanceResponse;
+                }));
     }
 }

@@ -1,5 +1,7 @@
 package ru.craftysoft.orderingsystem.gateway.logic;
 
+import lombok.extern.slf4j.Slf4j;
+import ru.craftysoft.orderingsystem.gateway.error.operation.ModuleOperationCode;
 import ru.craftysoft.orderingsystem.gateway.order.rest.model.ProcessOrderResponseData;
 import ru.craftysoft.orderingsystem.gateway.service.grpc.ExecutorServiceClientAdapter;
 import ru.craftysoft.orderingsystem.gateway.service.grpc.OrderServiceClientAdapter;
@@ -10,7 +12,10 @@ import javax.inject.Singleton;
 import java.util.concurrent.CompletableFuture;
 
 import static ru.craftysoft.orderingsystem.order.proto.ReserveOrderResponseData.Result.RESERVED;
+import static ru.craftysoft.orderingsystem.util.error.exception.ExceptionFactory.mapException;
+import static ru.craftysoft.orderingsystem.util.mdc.MdcUtils.withMdc;
 
+@Slf4j
 @Singleton
 public class ProcessOrderOperation {
 
@@ -28,19 +33,24 @@ public class ProcessOrderOperation {
     }
 
     public CompletableFuture<ProcessOrderResponseData> process(long id, String authorization) {
+        log.info("ProcessOrderOperation.process.in");
         return userServiceClientAdapter.getUserId(authorization)
-                .thenCompose(executorServiceClientAdapter::getExecutor)
-                .thenCompose(getUserIdResponse -> orderServiceClientAdapter.reserveOrder(id, getUserIdResponse))
-                .handleAsync((reserveOrderResponse, throwable) -> {
+                .thenCompose(withMdc(executorServiceClientAdapter::getExecutor))
+                .thenCompose(withMdc(getUserIdResponse -> {
+                    return orderServiceClientAdapter.reserveOrder(id, getUserIdResponse);
+                }))
+                .handleAsync(withMdc((reserveOrderResponse, throwable) -> {
                     if (throwable != null) {
-                        throw new RuntimeException(throwable);
+                        log.error("ProcessOrderOperation.process.thrown {}", throwable.getMessage());
+                        throw mapException(throwable, ModuleOperationCode::resolve);
                     }
                     var message = RESERVED.equals(reserveOrderResponse.getReserveOrderResponseData().getResult())
                             ? "Заказ зарезервирован"
                             : "Не удалось зарезервировать заказ";
                     var response = new ProcessOrderResponseData();
                     response.setMessage(message);
+                    log.info("ProcessOrderOperation.process.in");
                     return response;
-                });
+                }));
     }
 }

@@ -1,11 +1,8 @@
 package ru.craftysoft.orderingsystem.orderprocessing.service.redis;
 
 import com.google.protobuf.AbstractMessageLite;
-import com.google.protobuf.GeneratedMessageV3;
-import com.google.protobuf.util.JsonFormat;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.support.BoundedAsyncPool;
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import ru.craftysoft.orderingsystem.customer.proto.UpdateCustomerBalanceResponse;
 import ru.craftysoft.orderingsystem.orderprocessing.builder.redis.*;
@@ -13,14 +10,19 @@ import ru.craftysoft.orderingsystem.orderprocessing.dto.Order;
 import ru.craftysoft.orderingsystem.orderprocessing.error.exception.RetryExpiryException;
 import ru.craftysoft.orderingsystem.orderprocessing.proto.*;
 import ru.craftysoft.orderingsystem.util.properties.PropertyResolver;
+import ru.craftysoft.orderingsystem.util.proto.ProtoUtils;
+import ru.craftysoft.orderingsystem.util.uuid.UuidUtils;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 import java.util.function.Predicate;
+
+import static ru.craftysoft.orderingsystem.util.mdc.MdcUtils.withMdc;
 
 @Singleton
 @Slf4j
@@ -72,234 +74,280 @@ public class RedisClientAdapter {
     public CompletableFuture<Void> sendMessagesToDecreaseCustomerAmountStream(Order order) {
         var request = decreaseCustomerAmountRequestBuilder.build(order);
         return redisPool.acquire()
-                .thenAccept(connection -> client.sendMessage(
-                        connection, decreaseCustomerAmountStream, request,
-                        AbstractMessageLite::toByteArray, this::toPrettyString
-                ));
+                .thenAccept(withMdc(connection -> {
+                    client.sendMessage(
+                            connection, decreaseCustomerAmountStream, UuidUtils.generateDefaultUuid(), request,
+                            AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
+                    );
+                }));
     }
 
     public CompletableFuture<Void> sendMessageToIncrementExecutorAmountStream(UpdateCustomerBalanceResponse updateCustomerBalanceResponse,
-                                                                              DecreaseCustomerAmountRequest decreaseCustomerAmountRequest) {
-        var request = incrementExecutorAmountRequestBuilder.build(updateCustomerBalanceResponse, decreaseCustomerAmountRequest);
+                                                                              Map.Entry<String, DecreaseCustomerAmountRequest> entry) {
+        var request = incrementExecutorAmountRequestBuilder.build(updateCustomerBalanceResponse, entry.getValue());
         return redisPool.acquire()
-                .thenAccept(connection -> client.sendMessage(
-                        connection, incrementExecutorAmountStream, request,
-                        AbstractMessageLite::toByteArray, this::toPrettyString
+                .thenAccept(withMdc(connection -> {
+                    client.sendMessage(
+                            connection, incrementExecutorAmountStream, entry.getKey(), request,
+                            AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
+                    );
+                }));
+    }
+
+    public CompletableFuture<Void> sendMessageToReserveOrderStream(Map.Entry<String, DecreaseCustomerAmountRequest> entry) {
+        var request = reserveOrderRequestBuilder.build(entry.getValue());
+        return redisPool.acquire()
+                .thenAccept(withMdc(connection -> {
+                    client.sendMessage(
+                            connection, reserveOrderStream, entry.getKey(), request,
+                            AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
+                    );
+                }));
+    }
+
+    public CompletableFuture<Void> sendMessageToIncrementCustomerAmountStream(Map.Entry<String, IncrementExecutorAmountRequest> entry) {
+        var request = incrementCustomerAmountRequestBuilder.build(entry.getValue());
+        return redisPool.acquire()
+                .thenAccept(withMdc(connection -> {
+                    client.sendMessage(
+                            connection, incrementCustomerAmountStream, entry.getKey(), request,
+                            AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
+                    );
+                }));
+    }
+
+    public CompletableFuture<Void> sendMessageToIncrementCustomerAmountStreamInRollback(Map.Entry<String, DecreaseExecutorAmountRequest> entry) {
+        var request = incrementCustomerAmountRequestBuilder.build(entry.getValue());
+        return redisPool.acquire()
+                .thenAccept(withMdc(connection -> {
+                    client.sendMessage(
+                            connection, incrementCustomerAmountStream, entry.getKey(), request,
+                            AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
+                    );
+                }));
+    }
+
+    public CompletableFuture<Void> sendMessageToDecreaseExecutorAmountStream(Map.Entry<String, CompleteOrderRequest> entry) {
+        var request = decreaseExecutorAmountRequestBuilder.build(entry.getValue());
+        return redisPool.acquire()
+                .thenAccept(withMdc(connection -> {
+                    client.sendMessage(
+                            connection, decreaseExecutorAmountStream, entry.getKey(), request,
+                            AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
+                    );
+                }));
+    }
+
+    public CompletableFuture<Void> sendMessageToCompleteOrderStream(Map.Entry<String, IncrementExecutorAmountRequest> entry) {
+        var request = completeOrderRequestBuilder.build(entry.getValue());
+        return redisPool.acquire()
+                .thenAccept(withMdc(connection -> {
+                    client.sendMessage(
+                            connection, completeOrderStream, entry.getKey(), request,
+                            AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
+                    );
+                }));
+    }
+
+    public CompletionStage<Void> sendMessageToReserveOrderStreamInRollback(Map.Entry<String, IncrementCustomerAmountRequest> entry) {
+        var request = reserveOrderRequestBuilder.build(entry.getValue());
+        return redisPool.acquire()
+                .thenAccept(withMdc(connection -> {
+                    client.sendMessage(
+                            connection, reserveOrderStream, entry.getKey(), request,
+                            AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
+                    );
+                }));
+    }
+
+    public CompletableFuture<List<Map.Entry<String, DecreaseCustomerAmountRequest>>> listenDecreaseCustomerAmountRequestMessages() {
+        return redisPool.acquire()
+                .thenCompose(withMdc(connection -> {
+                            return client.subscribe(
+                                            connection, decreaseCustomerAmountStream,
+                                            decreaseCustomerAmountRequestBuilder::fromBytes, ProtoUtils::toPrettyString
+                                    )
+                                    .whenComplete(withMdc((requests, throwable) -> {
+                                        redisPool.release(connection);
+                                    }));
+                        }
                 ));
     }
 
-    public CompletableFuture<Void> sendMessageToReserveOrderStream(DecreaseCustomerAmountRequest decreaseCustomerAmountRequest) {
-        var request = reserveOrderRequestBuilder.build(decreaseCustomerAmountRequest);
+    public CompletableFuture<List<Map.Entry<String, IncrementExecutorAmountRequest>>> listenIncrementExecutorAmountRequestMessages() {
         return redisPool.acquire()
-                .thenAccept(connection -> client.sendMessage(
-                        connection, reserveOrderStream, request,
-                        AbstractMessageLite::toByteArray, this::toPrettyString
+                .thenCompose(withMdc(connection -> {
+                            return client.subscribe(
+                                            connection, incrementExecutorAmountStream,
+                                            incrementExecutorAmountRequestBuilder::fromBytes, ProtoUtils::toPrettyString
+                                    )
+                                    .whenComplete(withMdc((requests, throwable) -> {
+                                        redisPool.release(connection);
+                                    }));
+                        }
                 ));
     }
 
-    public CompletableFuture<Void> sendMessageToIncrementCustomerAmountStream(IncrementExecutorAmountRequest incrementExecutorAmountRequest) {
-        var request = incrementCustomerAmountRequestBuilder.build(incrementExecutorAmountRequest);
+    public CompletableFuture<List<Map.Entry<String, ReserveOrderRequest>>> listenReserveOrderRequestMessages() {
         return redisPool.acquire()
-                .thenAccept(connection -> client.sendMessage(
-                        connection, incrementCustomerAmountStream, request,
-                        AbstractMessageLite::toByteArray, this::toPrettyString
+                .thenCompose(withMdc(connection -> {
+                            return client.subscribe(
+                                            connection, reserveOrderStream,
+                                            reserveOrderRequestBuilder::fromBytes, ProtoUtils::toPrettyString
+                                    )
+                                    .whenComplete(withMdc((requests, throwable) -> {
+                                        redisPool.release(connection);
+                                    }));
+                        }
                 ));
     }
 
-    public CompletableFuture<Void> sendMessageToIncrementCustomerAmountStream(DecreaseExecutorAmountRequest incrementExecutorAmountRequest) {
-        var request = incrementCustomerAmountRequestBuilder.build(incrementExecutorAmountRequest);
+    public CompletableFuture<List<Map.Entry<String, CompleteOrderRequest>>> listenCompleteOrderRequestMessages() {
         return redisPool.acquire()
-                .thenAccept(connection -> client.sendMessage(
-                        connection, incrementCustomerAmountStream, request,
-                        AbstractMessageLite::toByteArray, this::toPrettyString
+                .thenCompose(withMdc(connection -> {
+                            return client.subscribe(
+                                            connection, completeOrderStream,
+                                            completeOrderRequestBuilder::fromBytes, ProtoUtils::toPrettyString
+                                    )
+                                    .whenComplete(withMdc((requests, throwable) -> {
+                                        redisPool.release(connection);
+                                    }));
+                        }
                 ));
     }
 
-    public CompletableFuture<Void> sendMessageToDecreaseExecutorAmountStream(CompleteOrderRequest completeOrderRequest) {
-        var request = decreaseExecutorAmountRequestBuilder.build(completeOrderRequest);
+    public CompletableFuture<List<Map.Entry<String, DecreaseExecutorAmountRequest>>> listenDecreaseExecutorAmountRequestMessages() {
         return redisPool.acquire()
-                .thenAccept(connection -> client.sendMessage(
-                        connection, decreaseExecutorAmountStream, request,
-                        AbstractMessageLite::toByteArray, this::toPrettyString
+                .thenCompose(withMdc(connection -> {
+                            return client.subscribe(
+                                            connection, decreaseExecutorAmountStream,
+                                            decreaseExecutorAmountRequestBuilder::fromBytes, ProtoUtils::toPrettyString
+                                    )
+                                    .whenComplete(withMdc((requests, throwable) -> {
+                                        redisPool.release(connection);
+                                    }));
+                        }
                 ));
     }
 
-    public CompletableFuture<Void> sendMessageToCompleteOrderStream(IncrementExecutorAmountRequest incrementExecutorAmountRequest) {
-        var request = completeOrderRequestBuilder.build(incrementExecutorAmountRequest);
+    public CompletableFuture<List<Map.Entry<String, IncrementCustomerAmountRequest>>> listenIncrementCustomerAmountRequestMessages() {
         return redisPool.acquire()
-                .thenAccept(connection -> client.sendMessage(
-                        connection, completeOrderStream, request,
-                        AbstractMessageLite::toByteArray, this::toPrettyString
+                .thenCompose(withMdc(connection -> {
+                            return client.subscribe(
+                                            connection, incrementCustomerAmountStream,
+                                            incrementCustomerAmountRequestBuilder::fromBytes, ProtoUtils::toPrettyString
+                                    )
+                                    .whenComplete(withMdc((requests, throwable) -> {
+                                        redisPool.release(connection);
+                                    }));
+                        }
                 ));
     }
 
-    public CompletionStage<Void> sendMessageToReserveOrderStream(IncrementCustomerAmountRequest incrementCustomerAmountRequest) {
-        var request = reserveOrderRequestBuilder.build(incrementCustomerAmountRequest);
-        return redisPool.acquire()
-                .thenAccept(connection -> client.sendMessage(
-                        connection, reserveOrderStream, request,
-                        AbstractMessageLite::toByteArray, this::toPrettyString
-                ));
-    }
-
-    public CompletableFuture<List<DecreaseCustomerAmountRequest>> listenDecreaseCustomerAmountRequestMessages() {
-        return redisPool.acquire()
-                .thenCompose(connection -> client.subscribe(
-                                        connection, decreaseCustomerAmountStream,
-                                        decreaseCustomerAmountRequestBuilder::fromBytes, this::toPrettyString
-                                )
-                                .whenComplete((requests, throwable) -> redisPool.release(connection))
-                );
-    }
-
-    public CompletableFuture<List<IncrementExecutorAmountRequest>> listenIncrementExecutorAmountRequestMessages() {
-        return redisPool.acquire()
-                .thenCompose(connection -> client.subscribe(
-                                        connection, incrementExecutorAmountStream,
-                                        incrementExecutorAmountRequestBuilder::fromBytes, this::toPrettyString
-                                )
-                                .whenComplete((requests, throwable) -> redisPool.release(connection))
-                );
-    }
-
-    public CompletableFuture<List<ReserveOrderRequest>> listenReserveOrderRequestMessages() {
-        return redisPool.acquire()
-                .thenCompose(connection -> client.subscribe(
-                                        connection, reserveOrderStream,
-                                        reserveOrderRequestBuilder::fromBytes, this::toPrettyString
-                                )
-                                .whenComplete((requests, throwable) -> redisPool.release(connection))
-                );
-    }
-
-    public CompletableFuture<List<CompleteOrderRequest>> listenCompleteOrderRequestMessages() {
-        return redisPool.acquire()
-                .thenCompose(connection -> client.subscribe(
-                                        connection, completeOrderStream,
-                                        completeOrderRequestBuilder::fromBytes, this::toPrettyString
-                                )
-                                .whenComplete((requests, throwable) -> redisPool.release(connection))
-                );
-    }
-
-    public CompletableFuture<List<DecreaseExecutorAmountRequest>> listenDecreaseExecutorAmountRequestMessages() {
-        return redisPool.acquire()
-                .thenCompose(connection -> client.subscribe(
-                                        connection, decreaseExecutorAmountStream,
-                                        decreaseExecutorAmountRequestBuilder::fromBytes, this::toPrettyString
-                                )
-                                .whenComplete((requests, throwable) -> redisPool.release(connection))
-                );
-    }
-
-    public CompletableFuture<List<IncrementCustomerAmountRequest>> listenIncrementCustomerAmountRequestMessages() {
-        return redisPool.acquire()
-                .thenCompose(connection -> client.subscribe(
-                                        connection, incrementCustomerAmountStream,
-                                        incrementCustomerAmountRequestBuilder::fromBytes, this::toPrettyString
-                                )
-                                .whenComplete((requests, throwable) -> redisPool.release(connection))
-                );
-    }
-
-    public CompletableFuture<Void> retryDecreaseCustomerAmountRequestMessage(DecreaseCustomerAmountRequest request,
+    public CompletableFuture<Void> retryDecreaseCustomerAmountRequestMessage(Map.Entry<String, DecreaseCustomerAmountRequest> entry,
                                                                              Throwable throwable) {
         return redisPool.acquire()
-                .thenAccept(connection -> {
+                .thenAccept(withMdc(connection -> {
+                    var request = entry.getValue();
                     int counter = resolveCounter(request, DecreaseCustomerAmountRequest::hasRetryData, rq -> rq.getRetryData().getCounter());
                     if (counter < maxRetryCounter) {
                         var newRequest = decreaseCustomerAmountRequestBuilder.build(request, counter);
                         client.sendMessage(
-                                connection, decreaseCustomerAmountStream, newRequest,
-                                AbstractMessageLite::toByteArray, this::toPrettyString
+                                connection, decreaseCustomerAmountStream, entry.getKey(), newRequest,
+                                AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
                         );
                     } else {
                         throw new RetryExpiryException(throwable);
                     }
-                });
+                }));
     }
 
-    public CompletableFuture<Void> retryIncrementExecutorAmountRequestMessage(IncrementExecutorAmountRequest request,
+    public CompletableFuture<Void> retryIncrementExecutorAmountRequestMessage(Map.Entry<String, IncrementExecutorAmountRequest> entry,
                                                                               Throwable throwable) {
         return redisPool.acquire()
-                .thenAccept(connection -> {
+                .thenAccept(withMdc(connection -> {
+                    var request = entry.getValue();
                     int counter = resolveCounter(request, IncrementExecutorAmountRequest::hasRetryData, rq -> rq.getRetryData().getCounter());
                     if (counter < maxRetryCounter) {
                         var newRequest = incrementExecutorAmountRequestBuilder.build(request, counter);
                         client.sendMessage(
-                                connection, decreaseExecutorAmountStream, newRequest,
-                                AbstractMessageLite::toByteArray, this::toPrettyString
+                                connection, decreaseExecutorAmountStream, entry.getKey(), newRequest,
+                                AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
                         );
                     } else {
                         throw new RetryExpiryException(throwable);
                     }
-                });
+                }));
     }
 
-    public CompletableFuture<Void> retryReserveOrderRequestMessage(ReserveOrderRequest request,
+    public CompletableFuture<Void> retryReserveOrderRequestMessage(Map.Entry<String, ReserveOrderRequest> entry,
                                                                    Throwable throwable) {
         return redisPool.acquire()
-                .thenAccept(connection -> {
+                .thenAccept(withMdc(connection -> {
+                    var request = entry.getValue();
                     int counter = resolveCounter(request, ReserveOrderRequest::hasRetryData, rq -> rq.getRetryData().getCounter());
                     if (counter < maxRetryCounter) {
                         var newRequest = reserveOrderRequestBuilder.build(request, counter);
                         client.sendMessage(
-                                connection, reserveOrderStream, newRequest,
-                                AbstractMessageLite::toByteArray, this::toPrettyString
+                                connection, reserveOrderStream, entry.getKey(), newRequest,
+                                AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
                         );
                     } else {
                         throw new RetryExpiryException(throwable);
                     }
-                });
+                }));
     }
 
-    public CompletionStage<Void> retryCompleteOrderRequestMessage(CompleteOrderRequest request,
+    public CompletionStage<Void> retryCompleteOrderRequestMessage(Map.Entry<String, CompleteOrderRequest> entry,
                                                                   Throwable throwable) {
         return redisPool.acquire()
-                .thenAccept(connection -> {
+                .thenAccept(withMdc(connection -> {
+                    var request = entry.getValue();
                     int counter = resolveCounter(request, CompleteOrderRequest::hasRetryData, rq -> rq.getRetryData().getCounter());
                     if (counter < maxRetryCounter) {
                         var newRequest = completeOrderRequestBuilder.build(request, counter);
                         client.sendMessage(
-                                connection, completeOrderStream, newRequest,
-                                AbstractMessageLite::toByteArray, this::toPrettyString
+                                connection, completeOrderStream, entry.getKey(), newRequest,
+                                AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
                         );
                     } else {
                         throw new RetryExpiryException(throwable);
                     }
-                });
+                }));
     }
 
-    public CompletionStage<Void> retryDecreaseExecutorAmountRequestMessage(DecreaseExecutorAmountRequest request, Throwable throwable) {
+    public CompletionStage<Void> retryDecreaseExecutorAmountRequestMessage(Map.Entry<String, DecreaseExecutorAmountRequest> entry, Throwable throwable) {
         return redisPool.acquire()
-                .thenAccept(connection -> {
+                .thenAccept(withMdc(connection -> {
+                    var request = entry.getValue();
                     int counter = resolveCounter(request, DecreaseExecutorAmountRequest::hasRetryData, rq -> rq.getRetryData().getCounter());
                     if (counter < maxRetryCounter) {
                         var newRequest = decreaseExecutorAmountRequestBuilder.build(request, counter);
                         client.sendMessage(
-                                connection, decreaseExecutorAmountStream, newRequest,
-                                AbstractMessageLite::toByteArray, this::toPrettyString
+                                connection, decreaseExecutorAmountStream, entry.getKey(), newRequest,
+                                AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
                         );
                     } else {
                         throw new RetryExpiryException(throwable);
                     }
-                });
+                }));
     }
 
-    public CompletionStage<Void> retryIncrementCustomerAmountRequestMessage(IncrementCustomerAmountRequest request, Throwable throwable) {
+    public CompletionStage<Void> retryIncrementCustomerAmountRequestMessage(Map.Entry<String, IncrementCustomerAmountRequest> entry, Throwable throwable) {
         return redisPool.acquire()
-                .thenAccept(connection -> {
+                .thenAccept(withMdc(connection -> {
+                    var request = entry.getValue();
                     int counter = resolveCounter(request, IncrementCustomerAmountRequest::hasRetryData, rq -> rq.getRetryData().getCounter());
                     if (counter < maxRetryCounter) {
                         var newRequest = incrementCustomerAmountRequestBuilder.build(request, counter);
                         client.sendMessage(
-                                connection, incrementCustomerAmountStream, newRequest,
-                                AbstractMessageLite::toByteArray, this::toPrettyString
+                                connection, incrementCustomerAmountStream, entry.getKey(), newRequest,
+                                AbstractMessageLite::toByteArray, ProtoUtils::toPrettyString
                         );
                     } else {
                         throw new RetryExpiryException(throwable);
                     }
-                });
+                }));
     }
 
     private <T> int resolveCounter(T request, Predicate<T> hasRetryData, Function<T, Integer> counterExtractor) {
@@ -309,10 +357,5 @@ public class RedisClientAdapter {
         var counter = counterExtractor.apply(request);
         counter++;
         return counter;
-    }
-
-    @SneakyThrows
-    private <T extends GeneratedMessageV3> String toPrettyString(T entity) {
-        return JsonFormat.printer().print(entity);
     }
 }

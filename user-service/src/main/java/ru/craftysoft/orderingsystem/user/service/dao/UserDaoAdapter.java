@@ -1,6 +1,5 @@
 package ru.craftysoft.orderingsystem.user.service.dao;
 
-import io.grpc.Context;
 import ru.craftysoft.orderingsystem.user.proto.GetRolesRequest;
 import ru.craftysoft.orderingsystem.user.proto.GetUserIdRequest;
 
@@ -11,7 +10,8 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
-import static ru.craftysoft.orderingsystem.util.mdc.MdcUtils.withContext;
+import static java.util.Optional.ofNullable;
+import static ru.craftysoft.orderingsystem.util.mdc.MdcUtils.withMdc;
 
 @Singleton
 public class UserDaoAdapter {
@@ -27,17 +27,15 @@ public class UserDaoAdapter {
     }
 
     public CompletableFuture<List<String>> getRoles(GetRolesRequest request) {
-        var context = Context.current();
         return CompletableFuture.supplyAsync(
-                () -> withContext(context, () -> dao.getRoles(request.getUserLogin(), request.getUserPassword())),
+                withMdc(() -> ofNullable(dao.getRoles(request.getUserLogin(), request.getUserPassword())).orElseGet(List::of)),
                 dbExecutor
         );
     }
 
     public CompletableFuture<Long> getUserId(GetUserIdRequest request) {
-        var context = Context.current();
         return CompletableFuture.supplyAsync(
-                () -> withContext(context, () -> dao.getUserId(request.getLogin())),
+                withMdc(() -> dao.getUserId(request.getLogin())),
                 dbExecutor
         );
     }

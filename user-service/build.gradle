@@ -1,3 +1,7 @@
+plugins {
+    id "application"
+}
+
 dependencies {
     implementation project(":util-lib")
     implementation project(":user-service:user-api")
@@ -10,3 +14,5 @@ dependencies {
         testAnnotationProcessor(it)
     }
 }
+
+application.getMainClass().set("ru.craftysoft.orderingsystem.user.Application")

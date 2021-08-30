@@ -35,4 +35,7 @@ public interface ApplicationComponent {
     @Named("customerServiceManagedChannel")
     ManagedChannel customerServiceManagedChannel();
 
+    @Named("executorServiceManagedChannel")
+    ManagedChannel executorServiceManagedChannel();
+
 }

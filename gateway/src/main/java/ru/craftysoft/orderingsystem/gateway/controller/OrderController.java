@@ -1,5 +1,8 @@
 package ru.craftysoft.orderingsystem.gateway.controller;
 
+import org.jboss.resteasy.spi.HttpRequest;
+import org.slf4j.MDC;
+import ru.craftysoft.orderingsystem.gateway.error.operation.ModuleOperationCode;
 import ru.craftysoft.orderingsystem.gateway.logic.AddOrderOperation;
 import ru.craftysoft.orderingsystem.gateway.logic.GetOrdersOperation;
 import ru.craftysoft.orderingsystem.gateway.logic.ProcessOrderOperation;
@@ -13,7 +16,15 @@ import javax.ws.rs.Consumes;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Response;
-import javax.ws.rs.core.SecurityContext;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.CompletionStage;
+
+import static java.util.Optional.ofNullable;
+import static ru.craftysoft.orderingsystem.gateway.error.operation.ModuleOperationCode.*;
+import static ru.craftysoft.orderingsystem.util.error.exception.ExceptionFactory.mapException;
+import static ru.craftysoft.orderingsystem.util.mdc.MdcKey.OPERATION_NAME;
+import static ru.craftysoft.orderingsystem.util.mdc.MdcUtils.withMdc;
 
 @Singleton
 @Consumes({"application/json;charset=UTF-8"})
@@ -36,24 +47,70 @@ public class OrderController implements OrdersApi {
 
     @Override
     @RolesAllowed({"customer"})
-    public java.util.concurrent.CompletionStage<javax.ws.rs.core.Response> addOrder(String authorization, AddOrderRequestData addOrderRequestData, SecurityContext securityContext) {
-        return addOrderOperation.process(authorization, addOrderRequestData)
-                .handleAsync((addOrderResponseData, throwable) -> Response.status(Response.Status.CREATED)
-                        .entity(addOrderResponseData)
-                        .build());
+    public CompletionStage<Response> addOrder(String authorization, AddOrderRequestData addOrderRequestData, org.jboss.resteasy.spi.HttpRequest request) {
+        try {
+            mdcInit(request, ADD_ORDER);
+            return addOrderOperation.process(authorization, addOrderRequestData)
+                    .handleAsync(withMdc((addOrderResponseData, throwable) -> {
+                        if (throwable != null) {
+                            throw mapException(throwable, ModuleOperationCode::resolve);
+                        }
+                        return Response.status(Response.Status.CREATED)
+                                .entity(addOrderResponseData)
+                                .build();
+                    }));
+        } finally {
+            MDC.clear();
+        }
     }
 
     @Override
     @RolesAllowed({"customer", "executor"})
-    public java.util.concurrent.CompletionStage<javax.ws.rs.core.Response> getOrders(SecurityContext securityContext) {
-        return getOrdersOperation.process()
-                .handleAsync((orders, throwable) -> Response.ok(orders).build());
+    public CompletionStage<Response> getOrders(org.jboss.resteasy.spi.HttpRequest request) {
+        try {
+            mdcInit(request, GET_ORDERS);
+            return getOrdersOperation.process()
+                    .handleAsync(withMdc((orders, throwable) -> {
+                        if (throwable != null) {
+                            throw mapException(throwable, ModuleOperationCode::resolve);
+                        }
+                        return Response.ok(orders).build();
+                    }));
+        } finally {
+            MDC.clear();
+        }
     }
 
     @Override
     @RolesAllowed({"executor"})
-    public java.util.concurrent.CompletionStage<javax.ws.rs.core.Response> processOrder(Long id, String authorization, SecurityContext securityContext) {
-        return processOrderOperation.process(id, authorization)
-                .handleAsync((processOrderResponseData, throwable) -> Response.accepted(processOrderResponseData).build());
+    public CompletionStage<Response> processOrder(Long id, String authorization, org.jboss.resteasy.spi.HttpRequest request) {
+        try {
+            mdcInit(request, PROCESS_ORDER);
+            return processOrderOperation.process(id, authorization)
+                    .handleAsync(withMdc((processOrderResponseData, throwable) -> {
+                        if (throwable != null) {
+                            throw mapException(throwable, ModuleOperationCode::resolve);
+                        }
+                        return Response.accepted(processOrderResponseData).build();
+                    }));
+        } finally {
+            MDC.clear();
+        }
+    }
+
+    private void mdcInit(HttpRequest request, ModuleOperationCode operationCode) {
+        ofNullable(request.getAttribute("mdc"))
+                .map(mdc -> {
+                    try {
+                        return (Map<String, String>) mdc;
+                    } catch (Exception e) {
+                        return null;
+                    }
+                })
+                .ifPresentOrElse(mdc -> {
+                    var newMdc = new HashMap<>(mdc);
+                    newMdc.put(OPERATION_NAME, operationCode.name());
+                    MDC.setContextMap(newMdc);
+                }, MDC::clear);
     }
 }

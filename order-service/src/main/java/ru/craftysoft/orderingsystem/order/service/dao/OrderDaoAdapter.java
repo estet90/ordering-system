@@ -1,7 +1,6 @@
 package ru.craftysoft.orderingsystem.order.service.dao;
 
 import com.google.type.Money;
-import io.grpc.Context;
 import ru.craftysoft.orderingsystem.order.dto.AddedOrder;
 import ru.craftysoft.orderingsystem.order.dto.Order;
 import ru.craftysoft.orderingsystem.order.proto.AddOrderRequest;
@@ -16,7 +15,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
-import static ru.craftysoft.orderingsystem.util.mdc.MdcUtils.withContext;
+import static ru.craftysoft.orderingsystem.util.mdc.MdcUtils.withMdc;
 
 @Singleton
 public class OrderDaoAdapter {
@@ -39,15 +38,13 @@ public class OrderDaoAdapter {
     }
 
     public CompletableFuture<List<Order>> getOrders() {
-        var context = Context.current();
         return CompletableFuture.supplyAsync(
-                () -> withContext(context, () -> dao.getOrders(this.statusActive)),
+                withMdc(() -> dao.getOrders(this.statusActive)),
                 dbExecutor
         );
     }
 
     public CompletableFuture<Long> addOrder(AddOrderRequest request) {
-        var context = Context.current();
         var price = request.getPrice();
         var balance = request.getCustomer().getBalance();
         var status = resolveStatus(price, balance);
@@ -58,7 +55,7 @@ public class OrderDaoAdapter {
                 status
         );
         return CompletableFuture.supplyAsync(
-                () -> withContext(context, () -> dao.addOrder(addedOrder)),
+                withMdc(() -> dao.addOrder(addedOrder)),
                 dbExecutor
         );
     }
@@ -75,9 +72,8 @@ public class OrderDaoAdapter {
     }
 
     public CompletableFuture<Integer> reserveOrder(ReserveOrderRequest request) {
-        var context = Context.current();
         return CompletableFuture.supplyAsync(
-                () -> withContext(context, () -> dao.updateOrderStatus(
+                withMdc(() -> dao.updateOrderStatus(
                         request.getId(),
                         request.getExecutorId(),
                         statusActive,

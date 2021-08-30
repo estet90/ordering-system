@@ -10,6 +10,11 @@ import javax.inject.Singleton;
 import java.util.concurrent.CompletableFuture;
 
 import static ru.craftysoft.orderingsystem.customer.proto.UpdateCustomerBalanceResponseData.Result.BALANCE_HAS_NOT_BEEN_CHANGED;
+import static ru.craftysoft.orderingsystem.orderprocessing.error.exception.BusinessExceptionCode.CUSTOMER_BALANCE_HAS_NOT_BEEN_DECREASED;
+import static ru.craftysoft.orderingsystem.orderprocessing.error.exception.BusinessExceptionCode.CUSTOMER_BALANCE_HAS_NOT_BEEN_INCREMENTED;
+import static ru.craftysoft.orderingsystem.orderprocessing.error.operation.ModuleOperationCode.resolve;
+import static ru.craftysoft.orderingsystem.util.error.exception.ExceptionFactory.newBusinessException;
+import static ru.craftysoft.orderingsystem.util.mdc.MdcUtils.withMdc;
 
 @Singleton
 public class CustomerServiceClientAdapter {
@@ -27,14 +32,12 @@ public class CustomerServiceClientAdapter {
                 .setDecreaseAmount(decreaseCustomerAmountRequest.getAmount())
                 .build();
         return client.updateCustomerBalance(request)
-                .whenComplete((updateCustomerBalanceResponse, throwable) -> {
-                    if (throwable != null) {
-                        throw new RuntimeException(throwable);
-                    }
+                .thenApply(withMdc(updateCustomerBalanceResponse -> {
                     if (BALANCE_HAS_NOT_BEEN_CHANGED.equals(updateCustomerBalanceResponse.getUpdateCustomerBalanceResponseData().getResult())) {
-                        throw new RuntimeException();
+                        throw newBusinessException(resolve(), CUSTOMER_BALANCE_HAS_NOT_BEEN_DECREASED);
                     }
-                });
+                    return updateCustomerBalanceResponse;
+                }));
     }
 
     public CompletableFuture<UpdateCustomerBalanceResponse> incrementAmount(IncrementCustomerAmountRequest incrementCustomerAmountRequest) {
@@ -43,13 +46,11 @@ public class CustomerServiceClientAdapter {
                 .setIncrementAmount(incrementCustomerAmountRequest.getAmount())
                 .build();
         return client.updateCustomerBalance(request)
-                .whenComplete((updateCustomerBalanceResponse, throwable) -> {
-                    if (throwable != null) {
-                        throw new RuntimeException(throwable);
-                    }
+                .thenApply(withMdc(updateCustomerBalanceResponse -> {
                     if (BALANCE_HAS_NOT_BEEN_CHANGED.equals(updateCustomerBalanceResponse.getUpdateCustomerBalanceResponseData().getResult())) {
-                        throw new RuntimeException();
+                        throw newBusinessException(resolve(), CUSTOMER_BALANCE_HAS_NOT_BEEN_INCREMENTED);
                     }
-                });
+                    return updateCustomerBalanceResponse;
+                }));
     }
 }

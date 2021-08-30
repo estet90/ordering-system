@@ -12,6 +12,10 @@ import java.util.Base64;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
+import static ru.craftysoft.orderingsystem.gateway.error.exception.SecurityExceptionCode.FORBIDDEN;
+import static ru.craftysoft.orderingsystem.gateway.error.operation.ModuleOperationCode.resolve;
+import static ru.craftysoft.orderingsystem.util.error.exception.ExceptionFactory.newSecurityException;
+
 @Singleton
 public class UserServiceClientAdapter {
 
@@ -34,14 +38,14 @@ public class UserServiceClientAdapter {
                 .thenAccept(response -> {
                     var userRoles = response.getGetRolesResponseData().getRolesList();
                     if (userRoles.isEmpty()) {
-                        throw new RuntimeException("Пользователь не имеет ролей");
+                        throw newSecurityException(resolve(), FORBIDDEN, "Пользователь с логином '%s' не имеет ролей".formatted(login));
                     }
                     for (var role : userRoles) {
                         if (roles.contains(role)) {
                             return;
                         }
                     }
-                    throw new RuntimeException("Пользователь не имеет ни одной из требуемых ролей");
+                    throw newSecurityException(resolve(), FORBIDDEN, "Пользователь с логином '%s' не имеет ни одной из требуемых ролей".formatted(login));
                 });
     }
 
