@@ -13,6 +13,7 @@ import java.util.Map;
 
 import static ru.craftysoft.orderingsystem.orderprocessing.error.operation.ModuleOperationCode.RESERVE_ORDER;
 import static ru.craftysoft.orderingsystem.orderprocessing.service.redis.RedisClient.REDIS_MESSAGE_ID;
+import static ru.craftysoft.orderingsystem.util.error.logging.ExceptionLoggerHelper.logError;
 import static ru.craftysoft.orderingsystem.util.mdc.MdcKey.*;
 import static ru.craftysoft.orderingsystem.util.mdc.MdcUtils.withMdc;
 
@@ -45,6 +46,11 @@ public class ReserveOrderOperation {
                             requests.forEach(this::processMessage);
                             log.info("{}.out", processPoint);
                         }
+                    }))
+                    .whenComplete(withMdc((unused, throwable) -> {
+                        if (throwable != null) {
+                            logError(log, processPoint, throwable);
+                        }
                     }));
         }
     }
@@ -54,12 +60,13 @@ public class ReserveOrderOperation {
             MDC.put(REDIS_MESSAGE_ID, entry.getKey());
             orderDaoAdapter.reserveOrder(entry.getValue());
         } catch (Exception e) {
+            logError(log, processPoint, e);
             redisClientAdapter.retryReserveOrderRequestMessage(entry, e)
                     .whenComplete(withMdc((ignored, retryThrowable) -> {
                         if (retryThrowable != null) {
-                            log.error("{}.retry.thrown", processMessagePoint, retryThrowable);
+                            logError(log, processMessagePoint + ".retry", retryThrowable);
                         } else {
-                            log.error("{}.retry.out", processMessagePoint);
+                            log.info("{}.retry.out", processMessagePoint);
                         }
                     }));
         } finally {

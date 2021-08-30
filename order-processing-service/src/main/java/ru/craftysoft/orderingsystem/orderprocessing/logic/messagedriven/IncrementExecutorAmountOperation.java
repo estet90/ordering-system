@@ -14,6 +14,7 @@ import java.util.Map;
 
 import static ru.craftysoft.orderingsystem.orderprocessing.error.operation.ModuleOperationCode.INCREMENT_EXECUTOR_AMOUNT;
 import static ru.craftysoft.orderingsystem.orderprocessing.service.redis.RedisClient.REDIS_MESSAGE_ID;
+import static ru.craftysoft.orderingsystem.util.error.logging.ExceptionLoggerHelper.logError;
 import static ru.craftysoft.orderingsystem.util.mdc.MdcKey.*;
 import static ru.craftysoft.orderingsystem.util.mdc.MdcUtils.withMdc;
 
@@ -51,7 +52,7 @@ public class IncrementExecutorAmountOperation {
                     }))
                     .whenComplete(withMdc((unused, throwable) -> {
                         if (throwable != null) {
-                            log.error("{}.thrown", processPoint, throwable);
+                            logError(log, processPoint, throwable);
                         }
                     }));
         }
@@ -62,7 +63,7 @@ public class IncrementExecutorAmountOperation {
             executorServiceClientAdapter.incrementAmount(entry.getValue())
                     .whenComplete((updateExecutorBalanceResponse, throwable) -> {
                         if (throwable != null) {
-                            log.error("{}.thrown", processMessagePoint, throwable);
+                            logError(log, processMessagePoint, throwable);
                             if (throwable instanceof RetryableException) {
                                 retryWithRollback(entry, throwable);
                             } else {
@@ -72,7 +73,7 @@ public class IncrementExecutorAmountOperation {
                             redisClientAdapter.sendMessageToCompleteOrderStream(entry)
                                     .whenComplete((unused, nextStepThrowable) -> {
                                         if (nextStepThrowable != null) {
-                                            log.error("{}.thrown", processMessagePoint, nextStepThrowable);
+                                            logError(log, processMessagePoint, nextStepThrowable);
                                             retryWithRollback(entry, nextStepThrowable);
                                         }
                                     });
@@ -85,7 +86,7 @@ public class IncrementExecutorAmountOperation {
         redisClientAdapter.retryIncrementExecutorAmountRequestMessage(entry, throwable)
                 .whenComplete((ignored, retryThrowable) -> {
                     if (retryThrowable != null) {
-                        log.error("{}.retry.thrown", processMessagePoint, retryThrowable);
+                        logError(log, processMessagePoint + ".retry", retryThrowable);
                         rollback(entry);
                     } else {
                         log.error("{}.retry.out", processMessagePoint);
@@ -97,7 +98,7 @@ public class IncrementExecutorAmountOperation {
         redisClientAdapter.sendMessageToIncrementCustomerAmountStream(entry)
                 .whenComplete((unused, rollbackThrowable) -> {
                     if (rollbackThrowable != null) {
-                        log.error("{}.rollback.thrown", processMessagePoint, rollbackThrowable);
+                        logError(log, processMessagePoint + ".rollback", rollbackThrowable);
                     } else {
                         log.info("{}.rollback.out", processMessagePoint);
                     }

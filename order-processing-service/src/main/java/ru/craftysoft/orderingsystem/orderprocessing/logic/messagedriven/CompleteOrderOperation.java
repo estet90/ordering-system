@@ -14,6 +14,7 @@ import java.util.Map;
 
 import static ru.craftysoft.orderingsystem.orderprocessing.error.operation.ModuleOperationCode.COMPLETE_ORDER;
 import static ru.craftysoft.orderingsystem.orderprocessing.service.redis.RedisClient.REDIS_MESSAGE_ID;
+import static ru.craftysoft.orderingsystem.util.error.logging.ExceptionLoggerHelper.logError;
 import static ru.craftysoft.orderingsystem.util.mdc.MdcKey.*;
 import static ru.craftysoft.orderingsystem.util.mdc.MdcUtils.withMdc;
 
@@ -50,7 +51,7 @@ public class CompleteOrderOperation {
                     }))
                     .whenComplete(withMdc((unused, throwable) -> {
                         if (throwable != null) {
-                            log.error("{}.thrown", processPoint, throwable);
+                            logError(log, processPoint, throwable);
                         }
                     }));
         }
@@ -61,10 +62,10 @@ public class CompleteOrderOperation {
             MDC.put(REDIS_MESSAGE_ID, entry.getKey());
             orderDaoAdapter.completeOrder(entry.getValue());
         } catch (RetryableException e) {
-            log.error("{}.thrown", processMessagePoint, e);
+            logError(log, processMessagePoint, e);
             retryWithRollback(entry, e);
         } catch (Exception e) {
-            log.error("{}.thrown", processMessagePoint, e);
+            logError(log, processMessagePoint, e);
             rollback(entry);
         } finally {
             MDC.remove(REDIS_MESSAGE_ID);
@@ -75,10 +76,10 @@ public class CompleteOrderOperation {
         redisClientAdapter.retryCompleteOrderRequestMessage(entry, e)
                 .whenComplete(withMdc((ignored, retryThrowable) -> {
                     if (retryThrowable != null) {
-                        log.error("{}.retry.thrown", processMessagePoint, retryThrowable);
+                        logError(log, processMessagePoint + ".retry", retryThrowable);
                         rollback(entry);
                     } else {
-                        log.error("{}.retry.out", processMessagePoint);
+                        log.info("{}.retry.out", processMessagePoint);
                     }
                 }));
     }
@@ -87,7 +88,7 @@ public class CompleteOrderOperation {
         redisClientAdapter.sendMessageToDecreaseExecutorAmountStream(entry)
                 .whenComplete(withMdc((unused, throwable) -> {
                     if (throwable != null) {
-                        log.error("{}.rollback.thrown", processMessagePoint, throwable);
+                        logError(log, processMessagePoint + ".rollback", throwable);
                     }
                 }));
     }

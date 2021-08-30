@@ -13,6 +13,7 @@ import java.util.Map;
 
 import static ru.craftysoft.orderingsystem.orderprocessing.error.operation.ModuleOperationCode.DECREASE_EXECUTOR_AMOUNT;
 import static ru.craftysoft.orderingsystem.orderprocessing.service.redis.RedisClient.REDIS_MESSAGE_ID;
+import static ru.craftysoft.orderingsystem.util.error.logging.ExceptionLoggerHelper.logError;
 import static ru.craftysoft.orderingsystem.util.mdc.MdcKey.*;
 import static ru.craftysoft.orderingsystem.util.mdc.MdcUtils.withMdc;
 
@@ -50,7 +51,7 @@ public class DecreaseExecutorAmountOperation {
                     }))
                     .whenComplete(withMdc((unused, throwable) -> {
                         if (throwable != null) {
-                            log.error("{}.thrown", processPoint, throwable);
+                            logError(log, processPoint, throwable);
                         }
                     }));
         }
@@ -61,13 +62,13 @@ public class DecreaseExecutorAmountOperation {
             executorServiceClientAdapter.decreaseAmount(entry.getValue())
                     .whenComplete(withMdc((updateCustomerBalanceResponse, throwable) -> {
                         if (throwable != null) {
-                            log.error("{}.thrown", processMessagePoint, throwable);
+                            logError(log, processMessagePoint, throwable);
                             retry(entry, throwable);
                         } else {
                             redisClientAdapter.sendMessageToIncrementCustomerAmountStreamInRollback(entry)
                                     .whenComplete(withMdc((unused, nextStepThrowable) -> {
                                         if (nextStepThrowable != null) {
-                                            log.error("{}.thrown", processMessagePoint, nextStepThrowable);
+                                            logError(log, processMessagePoint, nextStepThrowable);
                                             retry(entry, nextStepThrowable);
                                         }
                                     }));
@@ -80,9 +81,9 @@ public class DecreaseExecutorAmountOperation {
         redisClientAdapter.retryDecreaseExecutorAmountRequestMessage(entry, throwable)
                 .whenComplete(withMdc((ignored, retryThrowable) -> {
                     if (retryThrowable != null) {
-                        log.error("{}.retry.thrown", processMessagePoint, retryThrowable);
+                        logError(log, processMessagePoint + ".retry", retryThrowable);
                     } else {
-                        log.error("{}.retry.out", processMessagePoint);
+                        log.info("{}.retry.out", processMessagePoint);
                     }
                 }));
     }

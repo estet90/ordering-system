@@ -14,6 +14,7 @@ import java.util.Map;
 
 import static ru.craftysoft.orderingsystem.orderprocessing.error.operation.ModuleOperationCode.DECREASE_CUSTOMER_AMOUNT;
 import static ru.craftysoft.orderingsystem.orderprocessing.service.redis.RedisClient.REDIS_MESSAGE_ID;
+import static ru.craftysoft.orderingsystem.util.error.logging.ExceptionLoggerHelper.logError;
 import static ru.craftysoft.orderingsystem.util.mdc.MdcKey.*;
 import static ru.craftysoft.orderingsystem.util.mdc.MdcUtils.withMdc;
 
@@ -52,7 +53,7 @@ public class DecreaseCustomerAmountOperation {
                     }))
                     .whenComplete(withMdc((unused, throwable) -> {
                         if (throwable != null) {
-                            log.error("{}.thrown", processPoint, throwable);
+                            logError(log, processPoint, throwable);
                         }
                     }));
         }
@@ -64,7 +65,7 @@ public class DecreaseCustomerAmountOperation {
             customerServiceClientAdapter.decreaseAmount(request)
                     .whenComplete(withMdc((updateCustomerBalanceResponse, throwable) -> {
                         if (throwable != null) {
-                            log.error("{}.thrown", processMessagePoint, throwable);
+                            logError(log, processMessagePoint, throwable);
                             if (throwable instanceof RetryableException) {
                                 retryWithRollback(entry, throwable);
                             } else {
@@ -74,7 +75,7 @@ public class DecreaseCustomerAmountOperation {
                             redisClientAdapter.sendMessageToIncrementExecutorAmountStream(updateCustomerBalanceResponse, entry)
                                     .whenComplete(withMdc((unused, nextStepThrowable) -> {
                                         if (nextStepThrowable != null) {
-                                            log.error("{}.thrown", processMessagePoint, nextStepThrowable);
+                                            logError(log, processMessagePoint, nextStepThrowable);
                                             if (nextStepThrowable instanceof RetryableException) {
                                                 retryWithRollback(entry, nextStepThrowable);
                                             } else {
@@ -91,10 +92,10 @@ public class DecreaseCustomerAmountOperation {
         redisClientAdapter.retryDecreaseCustomerAmountRequestMessage(entry, throwable)
                 .whenComplete(withMdc((ignored, retryThrowable) -> {
                     if (retryThrowable != null) {
-                        log.error("{}.retry.thrown", processMessagePoint, retryThrowable);
+                        logError(log, processMessagePoint + ".retry", retryThrowable);
                         rollback(entry);
                     } else {
-                        log.error("{}.retry.out", processMessagePoint);
+                        log.info("{}.retry.out", processMessagePoint);
                     }
                 }));
     }
@@ -103,7 +104,7 @@ public class DecreaseCustomerAmountOperation {
         redisClientAdapter.sendMessageToReserveOrderStream(entry)
                 .whenComplete(withMdc((unused, rollbackThrowable) -> {
                     if (rollbackThrowable != null) {
-                        log.error("{}.rollback.thrown", processMessagePoint, rollbackThrowable);
+                        logError(log, processMessagePoint + ".rollback", rollbackThrowable);
                     }
                 }));
     }
