@@ -45,6 +45,7 @@ public class ExtractOrderOperation {
         try {
             var orders = orderDaoAdapter.processOrders();
             var futures = orders.stream().map(order -> redisClientAdapter.sendMessagesToDecreaseCustomerAmountStream(order)
+                            .toCompletableFuture()
                             .whenComplete(withMdc((unused, throwable) -> {
                                 if (throwable != null) {
                                     logError(log, point + ".processOrder", throwable);
