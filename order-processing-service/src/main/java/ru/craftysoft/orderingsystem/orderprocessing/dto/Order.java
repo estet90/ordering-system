@@ -4,6 +4,6 @@ import java.math.BigDecimal;
 
 public record Order(long id,
                     BigDecimal price,
-                    long consumerId,
+                    long customerId,
                     long executorId) {
 }

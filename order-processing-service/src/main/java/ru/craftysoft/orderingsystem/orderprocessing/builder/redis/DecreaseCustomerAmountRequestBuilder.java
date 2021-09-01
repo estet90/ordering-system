@@ -20,7 +20,7 @@ public class DecreaseCustomerAmountRequestBuilder {
     public DecreaseCustomerAmountRequest build(Order order) {
         return DecreaseCustomerAmountRequest.newBuilder()
                 .setOrderId(order.id())
-                .setCustomerId(order.executorId())
+                .setCustomerId(order.customerId())
                 .setExecutorId(order.executorId())
                 .setAmount(bigDecimalToMoney(order.price()))
                 .build();
