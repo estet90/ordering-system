@@ -2,6 +2,7 @@ package ru.craftysoft.orderingsystem.orderprocessing.logic.messagedriven;
 
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
+import ru.craftysoft.orderingsystem.orderprocessing.error.operation.ModuleOperationCode;
 import ru.craftysoft.orderingsystem.orderprocessing.proto.CompleteOrderRequest;
 import ru.craftysoft.orderingsystem.orderprocessing.service.dao.OrderDaoAdapter;
 import ru.craftysoft.orderingsystem.orderprocessing.service.redis.RedisClientAdapter;
@@ -16,6 +17,7 @@ import java.util.concurrent.CompletionStage;
 
 import static ru.craftysoft.orderingsystem.orderprocessing.error.operation.ModuleOperationCode.COMPLETE_ORDER;
 import static ru.craftysoft.orderingsystem.orderprocessing.service.redis.RedisClient.REDIS_MESSAGE_ID;
+import static ru.craftysoft.orderingsystem.util.error.exception.ExceptionFactory.mapException;
 import static ru.craftysoft.orderingsystem.util.error.logging.ExceptionLoggerHelper.logError;
 import static ru.craftysoft.orderingsystem.util.mdc.MdcKey.*;
 import static ru.craftysoft.orderingsystem.util.mdc.MdcUtils.withMdc;
@@ -74,7 +76,7 @@ public class CompleteOrderOperation {
                     }))
                     .exceptionallyCompose(withMdc(throwable -> {
                         logError(log, processMessagePoint, throwable);
-                        if (throwable instanceof RetryableException retryableException) {
+                        if (mapException(throwable, ModuleOperationCode::resolve) instanceof RetryableException retryableException) {
                             return retryWithRollback(entry, retryableException);
                         }
                         return rollback(entry);

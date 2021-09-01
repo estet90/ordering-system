@@ -16,6 +16,7 @@ import static ru.craftysoft.orderingsystem.orderprocessing.error.exception.Busin
 import static ru.craftysoft.orderingsystem.orderprocessing.error.exception.BusinessExceptionCode.ORDER_HAS_NOT_BEEN_RESERVED;
 import static ru.craftysoft.orderingsystem.orderprocessing.error.operation.ModuleOperationCode.resolve;
 import static ru.craftysoft.orderingsystem.util.error.exception.ExceptionFactory.newBusinessException;
+import static ru.craftysoft.orderingsystem.util.mdc.MdcUtils.withMdc;
 import static ru.craftysoft.orderingsystem.util.proto.ProtoUtils.moneyToBigDecimal;
 
 @Singleton
@@ -43,30 +44,30 @@ public class OrderDaoAdapter {
     }
 
     public CompletableFuture<Void> reserveOrder(Order order) {
-        return CompletableFuture.supplyAsync(() -> dao.updateOrderStatus(order.id(), statusReserved), dbExecutor)
-                .thenAccept(count -> {
+        return CompletableFuture.supplyAsync(withMdc(() -> dao.updateOrderStatus(order.id(), statusReserved)), dbExecutor)
+                .thenAccept(withMdc(count -> {
                     if (count == 0) {
                         throw newBusinessException(resolve(), ORDER_HAS_NOT_BEEN_RESERVED, "id='%s'".formatted(order.id()));
                     }
-                });
+                }));
 
     }
 
     public CompletableFuture<Void> reserveOrder(ReserveOrderRequest request) {
-        return CompletableFuture.supplyAsync(() -> dao.updateOrderStatus(request.getOrderId(), statusReserved), dbExecutor)
-                .thenAccept(count -> {
+        return CompletableFuture.supplyAsync(withMdc(() -> dao.updateOrderStatus(request.getOrderId(), statusReserved)), dbExecutor)
+                .thenAccept(withMdc(count -> {
                     if (count == 0) {
                         throw newBusinessException(resolve(), ORDER_HAS_NOT_BEEN_RESERVED, "id='%s'".formatted(request.getOrderId()));
                     }
-                });
+                }));
     }
 
     public CompletableFuture<Void> completeOrder(CompleteOrderRequest request) {
-        return CompletableFuture.supplyAsync(() -> dao.completeOrder(request.getOrderId(), request.getCustomerId(), moneyToBigDecimal(request.getCustomerBalance())), dbExecutor)
-                .thenAccept(count -> {
+        return CompletableFuture.supplyAsync(withMdc(() -> dao.completeOrder(request.getOrderId(), request.getCustomerId(), moneyToBigDecimal(request.getCustomerBalance()))), dbExecutor)
+                .thenAccept(withMdc(count -> {
                     if (count == 0) {
                         throw newBusinessException(resolve(), ORDER_HAS_NOT_BEEN_COMPLETED, "id='%s'".formatted(request.getOrderId()));
                     }
-                });
+                }));
     }
 }

@@ -6,15 +6,15 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import ru.craftysoft.orderingsystem.orderprocessing.DaggerTestApplicationComponent;
 import ru.craftysoft.orderingsystem.orderprocessing.DaggerTestWithoutDbApplicationComponent;
 import ru.craftysoft.orderingsystem.orderprocessing.OperationTest;
+import ru.craftysoft.orderingsystem.orderprocessing.builder.redis.DecreaseCustomerAmountRequestBuilder;
 import ru.craftysoft.orderingsystem.orderprocessing.dto.TestOrder;
 import ru.craftysoft.orderingsystem.orderprocessing.extension.DbExtension;
 import ru.craftysoft.orderingsystem.orderprocessing.extension.RedisExtension;
-import ru.craftysoft.orderingsystem.orderprocessing.proto.DecreaseCustomerAmountRequest;
 import ru.craftysoft.orderingsystem.util.db.DbHelper;
 import ru.craftysoft.orderingsystem.util.error.exception.RetryableException;
+import ru.craftysoft.orderingsystem.util.proto.ProtoUtils;
 
 import javax.inject.Inject;
-import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static ru.craftysoft.orderingsystem.orderprocessing.error.exception.InvocationExceptionCode.DB;
@@ -30,7 +30,9 @@ public class ExtractOrderOperationTest extends OperationTest {
     @Inject
     ExtractOrderOperation operation;
     @Inject
-    protected DbHelper dbHelper;
+    DbHelper dbHelper;
+    @Inject
+    DecreaseCustomerAmountRequestBuilder decreaseCustomerAmountRequestBuilder;
 
     @Test
     @ExtendWith({
@@ -62,10 +64,11 @@ public class ExtractOrderOperationTest extends OperationTest {
         );
         assertEquals("in_processing", order.status());
         var streamKey = propertyResolver.getStringProperty("redis.stream.decrease-customer-amount.name");
-        var messages = thenSentMessages(streamKey);
-        assertEquals(1, messages.size());
-        var message = messages.get(0);
-        var decreaseCustomerAmountRequest = DecreaseCustomerAmountRequest.parseFrom(message.getBody().get("payload").getBytes(StandardCharsets.UTF_8));
+        var entries = redisClient.subscribe(streamKey, decreaseCustomerAmountRequestBuilder::fromBytes, ProtoUtils::toPrettyString)
+                .toCompletableFuture()
+                .get();
+        assertEquals(1, entries.size());
+        var decreaseCustomerAmountRequest = entries.get(0).getValue();
         assertFalse(decreaseCustomerAmountRequest.hasRetryData());
         assertEquals(order.id(), decreaseCustomerAmountRequest.getOrderId());
         assertEquals(order.customerId(), decreaseCustomerAmountRequest.getCustomerId());

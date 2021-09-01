@@ -2,6 +2,7 @@ package ru.craftysoft.orderingsystem.orderprocessing;
 
 import dagger.Component;
 import ru.craftysoft.orderingsystem.orderprocessing.logic.ExtractOrderOperationTest;
+import ru.craftysoft.orderingsystem.orderprocessing.logic.messagedriven.CompleteOrderOperationTest;
 import ru.craftysoft.orderingsystem.orderprocessing.module.*;
 
 import javax.inject.Singleton;
@@ -18,5 +19,7 @@ import javax.inject.Singleton;
 public interface TestApplicationComponent {
 
     void inject(ExtractOrderOperationTest operationTest);
+
+    void inject(CompleteOrderOperationTest operationTest);
 
 }
