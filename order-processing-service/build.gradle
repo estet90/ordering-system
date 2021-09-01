@@ -21,8 +21,6 @@ dependencies {
     protobuf files("src/main/resources/proto")
     testImplementation(
             "org.junit.jupiter:junit-jupiter:$junitVersion",
-            "org.assertj:assertj-core:3.20.2",
-            'org.mockito:mockito-core:3.12.1',
 
             "org.testcontainers:postgresql:$testcontainersPostgresqlVersion",
             "com.redislabs:testcontainers-redis:$testcontainersRedisVersion",

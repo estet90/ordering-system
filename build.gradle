@@ -31,13 +31,15 @@ allprojects {
         picocliVersion = "4.6.1"
         liquibaseVersion = "4.4.3"
         jakartaValidationApiVersion = "3.0.0"
-        openapiGradlePluginVersion = "5.2.1"
-        protobufGradleOluginVersion = "0.8.17"
         nettyVersion = "4.1.65.Final"
 
         junitVersion = "5.7.2"
         testcontainersPostgresqlVersion = "1.16.0"
         testcontainersRedisVersion = "1.1.6"
+
+        openapiGradlePluginVersion = "5.2.1"
+        protobufGradleOluginVersion = "0.8.17"
+        beryxRuntimeVersion = "1.12.5"
 
         dbUrl = "jdbc:postgresql://localhost:5432/ordering_system"
         dbUsername = "ordering_system"

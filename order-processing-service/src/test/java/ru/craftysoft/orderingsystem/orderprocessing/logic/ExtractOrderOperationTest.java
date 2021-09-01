@@ -1,7 +1,6 @@
 package ru.craftysoft.orderingsystem.orderprocessing.logic;
 
 import lombok.SneakyThrows;
-import org.assertj.core.api.Condition;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import ru.craftysoft.orderingsystem.orderprocessing.DaggerTestApplicationComponent;
@@ -9,19 +8,21 @@ import ru.craftysoft.orderingsystem.orderprocessing.OperationTest;
 import ru.craftysoft.orderingsystem.orderprocessing.dto.TestOrder;
 import ru.craftysoft.orderingsystem.orderprocessing.extension.DbExtension;
 import ru.craftysoft.orderingsystem.orderprocessing.extension.RedisExtension;
-import ru.craftysoft.orderingsystem.orderprocessing.proto.DecreaseExecutorAmountRequest;
+import ru.craftysoft.orderingsystem.orderprocessing.proto.DecreaseCustomerAmountRequest;
+import ru.craftysoft.orderingsystem.util.db.DbHelper;
 
 import javax.inject.Inject;
 import java.nio.charset.StandardCharsets;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static ru.craftysoft.orderingsystem.util.proto.ProtoUtils.moneyToBigDecimal;
 
 public class ExtractOrderOperationTest extends OperationTest {
 
     @Inject
     ExtractOrderOperation operation;
+    @Inject
+    protected DbHelper dbHelper;
 
     @Test
     @ExtendWith({
@@ -51,17 +52,19 @@ public class ExtractOrderOperationTest extends OperationTest {
                 ),
                 reservedOrderId
         );
-        assertThat(order.status()).isEqualTo("in_processing");
-        var message = thenSentMessage("redis.stream.decrease-customer-amount.name");
-        var decreaseCustomerAmountRequest = DecreaseExecutorAmountRequest.parseFrom(message.getBody().get("payload").getBytes(StandardCharsets.UTF_8));
-        assertThat(decreaseCustomerAmountRequest.hasRetryData()).isFalse();
-        assertThat(decreaseCustomerAmountRequest.getOrderId()).isEqualTo(order.id());
-        assertThat(decreaseCustomerAmountRequest.getCustomerId()).isEqualTo(order.customerId());
-        assertThat(decreaseCustomerAmountRequest.getAmount()).isNotNull().is(new Condition<>(amount -> {
-            var amountAsBigDecimal = moneyToBigDecimal(amount);
-            assertThat(amountAsBigDecimal).isEqualTo(order.price());
-            return true;
-        }, "price"));
+        assertEquals("in_processing", order.status());
+        var streamKey = propertyResolver.getStringProperty("redis.stream.decrease-customer-amount.name");
+        var messages = thenSentMessages(streamKey);
+        assertEquals(1, messages.size());
+        var message = messages.get(0);
+        var decreaseCustomerAmountRequest = DecreaseCustomerAmountRequest.parseFrom(message.getBody().get("payload").getBytes(StandardCharsets.UTF_8));
+        assertFalse(decreaseCustomerAmountRequest.hasRetryData());
+        assertEquals(order.id(), decreaseCustomerAmountRequest.getOrderId());
+        assertEquals(order.customerId(), decreaseCustomerAmountRequest.getCustomerId());
+        var amount = decreaseCustomerAmountRequest.getAmount();
+        assertNotNull(amount);
+        var amountAsBigDecimal = moneyToBigDecimal(amount);
+        assertEquals(order.price(), amountAsBigDecimal);
     }
 
     @Test
@@ -90,7 +93,7 @@ public class ExtractOrderOperationTest extends OperationTest {
                 ),
                 reservedOrderId
         );
-        assertThat(order.status()).isEqualTo("reserved");
+        assertEquals("reserved", order.status());
     }
 
     @SneakyThrows

@@ -48,6 +48,10 @@ public class MdcUtils {
 
     public static <U> Supplier<U> withMdc(Supplier<U> supplier) {
         var mdc = MDC.getCopyOfContextMap();
+        return withMdc(mdc, supplier);
+    }
+
+    public static <U> Supplier<U> withMdc(Map<String, String> mdc, Supplier<U> supplier) {
         if (mdc == null) {
             return supplier;
         }

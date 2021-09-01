@@ -65,11 +65,13 @@ public class CustomerServiceClient {
 
                     @Override
                     public void onError(Throwable throwable) {
-                        withMdc(mdc, () -> log.error("{}.onError.thrown {}", point, throwable.getMessage()));
-                        var baseException = mapException(
-                                log, point, mdc, throwable,
-                                errorResponseBuilder, invocationExceptionFactory, retryableExceptionFactory, baseExceptionFiller
-                        );
+                        var baseException = withMdc(mdc, () -> {
+                            log.error("{}.onError.thrown {}", point, throwable.getMessage());
+                            return mapException(
+                                    log, point, mdc, throwable,
+                                    errorResponseBuilder, invocationExceptionFactory, retryableExceptionFactory, baseExceptionFiller
+                            );
+                        }).get();
                         result.completeExceptionally(baseException);
                     }
 

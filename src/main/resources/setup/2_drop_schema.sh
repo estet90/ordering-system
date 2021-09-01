@@ -1,3 +1,3 @@
 #!/bin/bash
 
-psql -U postgres -h localhost -d ordering_system -f 2_drop_schema.sql
+psql postgresql://postgres:postgres@localhost:5432/ordering_system -f 2_drop_schema.sql

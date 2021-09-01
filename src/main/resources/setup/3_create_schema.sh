@@ -1,3 +1,3 @@
 #!/bin/bash
 
-psql -U ordering_system -h localhost -d ordering_system -f 3_create_schema.sql
+psql postgresql://ordering_system:ordering_system@localhost:5432/ordering_system -f 3_create_schema.sql

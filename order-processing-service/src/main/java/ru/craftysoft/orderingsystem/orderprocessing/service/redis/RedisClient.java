@@ -64,7 +64,7 @@ public class RedisClient {
                                 redisPool.release(connection);
                                 return msgId;
                             }))
-                    ).toCompletableFuture();
+                    );
         }
     }
 
@@ -105,8 +105,9 @@ public class RedisClient {
                                 }
                                 return List.<Map.Entry<String, T>>of();
                             }))
-                            .whenComplete(withMdc((list, throwable) -> {
+                            .thenApply(withMdc((list) -> {
                                 redisPool.release(connection);
+                                return list;
                             }));
                 });
     }
