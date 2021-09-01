@@ -2,6 +2,7 @@ package ru.craftysoft.orderingsystem.orderprocessing.logic.messagedriven;
 
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
+import ru.craftysoft.orderingsystem.orderprocessing.error.operation.ModuleOperationCode;
 import ru.craftysoft.orderingsystem.orderprocessing.proto.IncrementExecutorAmountRequest;
 import ru.craftysoft.orderingsystem.orderprocessing.service.grpc.ExecutorServiceClientAdapter;
 import ru.craftysoft.orderingsystem.orderprocessing.service.redis.RedisClientAdapter;
@@ -11,9 +12,12 @@ import ru.craftysoft.orderingsystem.util.uuid.UuidUtils;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 import static ru.craftysoft.orderingsystem.orderprocessing.error.operation.ModuleOperationCode.INCREMENT_EXECUTOR_AMOUNT;
 import static ru.craftysoft.orderingsystem.orderprocessing.service.redis.RedisClient.REDIS_MESSAGE_ID;
+import static ru.craftysoft.orderingsystem.util.error.exception.ExceptionFactory.mapException;
 import static ru.craftysoft.orderingsystem.util.error.logging.ExceptionLoggerHelper.logError;
 import static ru.craftysoft.orderingsystem.util.mdc.MdcKey.*;
 import static ru.craftysoft.orderingsystem.util.mdc.MdcUtils.withMdc;
@@ -43,65 +47,66 @@ public class IncrementExecutorAmountOperation {
              var ignored2 = MDC.putCloseable(SPAN_ID, UuidUtils.generateDefaultUuid());
              var ignored3 = MDC.putCloseable(OPERATION_NAME, INCREMENT_EXECUTOR_AMOUNT.name())) {
             redisClientAdapter.listenIncrementExecutorAmountRequestMessages()
-                    .thenAccept(withMdc(requests -> {
-                        if (!requests.isEmpty()) {
-                            log.info("{}.in size={}", processPoint, requests.size());
-                            requests.forEach(this::processMessage);
-                            log.info("{}.out", processPoint);
-                        }
-                    }))
                     .whenComplete(withMdc((unused, throwable) -> {
                         if (throwable != null) {
                             logError(log, processPoint, throwable);
                         }
+                    }))
+                    .thenCompose(withMdc(requests -> {
+                        if (!requests.isEmpty()) {
+                            log.info("{}.in size={}", processPoint, requests.size());
+                            var futures = requests.stream()
+                                    .map(this::processMessage)
+                                    .toArray(value -> new CompletableFuture<?>[requests.size()]);
+                            return CompletableFuture.allOf(futures)
+                                    .whenComplete(withMdc((v, t) -> {
+                                        log.info("{}.out", processPoint);
+                                    }));
+                        }
+                        return new CompletableFuture<>();
                     }));
         }
     }
 
-    private void processMessage(Map.Entry<String, IncrementExecutorAmountRequest> entry) {
+    private CompletableFuture<String> processMessage(Map.Entry<String, IncrementExecutorAmountRequest> entry) {
         try (var ignored = MDC.putCloseable(REDIS_MESSAGE_ID, entry.getKey())) {
-            executorServiceClientAdapter.incrementAmount(entry.getValue())
-                    .whenComplete((updateExecutorBalanceResponse, throwable) -> {
-                        if (throwable != null) {
-                            logError(log, processMessagePoint, throwable);
-                            if (throwable instanceof RetryableException) {
-                                retryWithRollback(entry, throwable);
-                            } else {
-                                rollback(entry);
-                            }
-                        } else {
-                            redisClientAdapter.sendMessageToCompleteOrderStream(entry)
-                                    .whenComplete((unused, nextStepThrowable) -> {
-                                        if (nextStepThrowable != null) {
-                                            logError(log, processMessagePoint, nextStepThrowable);
-                                            retryWithRollback(entry, nextStepThrowable);
-                                        }
-                                    });
+            return executorServiceClientAdapter.incrementAmount(entry.getValue())
+                    .thenCompose(withMdc(updateExecutorBalanceResponse -> {
+                        return redisClientAdapter.sendMessageToCompleteOrderStream(entry)
+                                .exceptionallyCompose(withMdc(nextStepThrowable -> {
+                                    logError(log, processMessagePoint, nextStepThrowable);
+                                    if (mapException(nextStepThrowable, ModuleOperationCode::resolve) instanceof RetryableException) {
+                                        return retryWithRollback(entry, nextStepThrowable);
+                                    }
+                                    return rollback(entry);
+                                }));
+                    }))
+                    .exceptionallyCompose(throwable -> {
+                        logError(log, processMessagePoint, throwable);
+                        if (mapException(throwable, ModuleOperationCode::resolve) instanceof RetryableException) {
+                            return retryWithRollback(entry, throwable);
                         }
+                        return rollback(entry);
                     });
         }
     }
 
-    private void retryWithRollback(Map.Entry<String, IncrementExecutorAmountRequest> entry, Throwable throwable) {
-        redisClientAdapter.retryIncrementExecutorAmountRequestMessage(entry, throwable)
-                .whenComplete((ignored, retryThrowable) -> {
-                    if (retryThrowable != null) {
-                        logError(log, processMessagePoint + ".retry", retryThrowable);
-                        rollback(entry);
-                    } else {
-                        log.error("{}.retry.out", processMessagePoint);
-                    }
+    private CompletionStage<String> retryWithRollback(Map.Entry<String, IncrementExecutorAmountRequest> entry, Throwable throwable) {
+        return redisClientAdapter.retryIncrementExecutorAmountRequestMessage(entry, throwable)
+                .exceptionallyCompose((retryThrowable) -> {
+                    logError(log, processMessagePoint + ".retry", retryThrowable);
+                    return rollback(entry);
                 });
     }
 
-    private void rollback(Map.Entry<String, IncrementExecutorAmountRequest> entry) {
-        redisClientAdapter.sendMessageToIncrementCustomerAmountStream(entry)
-                .whenComplete((unused, rollbackThrowable) -> {
+    private CompletionStage<String> rollback(Map.Entry<String, IncrementExecutorAmountRequest> entry) {
+        return redisClientAdapter.sendMessageToIncrementCustomerAmountStream(entry)
+                .whenComplete(withMdc((unused, rollbackThrowable) -> {
                     if (rollbackThrowable != null) {
                         logError(log, processMessagePoint + ".rollback", rollbackThrowable);
                     } else {
                         log.info("{}.rollback.out", processMessagePoint);
                     }
-                });
+                }));
     }
 }

@@ -16,7 +16,8 @@ import java.util.Objects;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 
-import static ru.craftysoft.orderingsystem.orderprocessing.error.exception.InvocationExceptionCode.REDIS;
+import static ru.craftysoft.orderingsystem.orderprocessing.error.exception.InvocationExceptionCode.REDIS_SEND;
+import static ru.craftysoft.orderingsystem.orderprocessing.error.exception.InvocationExceptionCode.REDIS_SUBSCRIBE;
 import static ru.craftysoft.orderingsystem.orderprocessing.error.operation.ModuleOperationCode.resolve;
 import static ru.craftysoft.orderingsystem.util.error.exception.ExceptionFactory.newRetryableException;
 import static ru.craftysoft.orderingsystem.util.mdc.MdcUtils.withMdc;
@@ -53,7 +54,7 @@ public class RedisClient {
                             .whenComplete(withMdc((s, throwable) -> {
                                 if (throwable != null) {
                                     log.error("RedisClient.sendMessage.thrown {}", throwable.getMessage());
-                                    throw newRetryableException(throwable, resolve(), REDIS, throwable.getMessage());
+                                    throw newRetryableException(throwable, resolve(), REDIS_SEND, throwable.getMessage());
                                 }
                                 if (log.isDebugEnabled()) {
                                     var loggedMessage = logMapper.apply(message);
@@ -64,7 +65,9 @@ public class RedisClient {
                                 redisPool.release(connection);
                                 return msgId;
                             }))
-                    );
+                    ).exceptionally(withMdc((Function<Throwable, String>) throwable -> {
+                        throw newRetryableException(throwable, resolve(), REDIS_SEND, throwable.getMessage());
+                    }));
         }
     }
 
@@ -109,6 +112,9 @@ public class RedisClient {
                                 redisPool.release(connection);
                                 return list;
                             }));
-                });
+                })
+                .exceptionally(withMdc((Function<Throwable, List<Map.Entry<String, T>>>) throwable -> {
+                    throw newRetryableException(throwable, resolve(), REDIS_SUBSCRIBE, throwable.getMessage());
+                }));
     }
 }

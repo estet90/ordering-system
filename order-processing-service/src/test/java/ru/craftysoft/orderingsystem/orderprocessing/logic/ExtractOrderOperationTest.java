@@ -4,17 +4,25 @@ import lombok.SneakyThrows;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import ru.craftysoft.orderingsystem.orderprocessing.DaggerTestApplicationComponent;
+import ru.craftysoft.orderingsystem.orderprocessing.DaggerTestWithoutDbApplicationComponent;
 import ru.craftysoft.orderingsystem.orderprocessing.OperationTest;
 import ru.craftysoft.orderingsystem.orderprocessing.dto.TestOrder;
 import ru.craftysoft.orderingsystem.orderprocessing.extension.DbExtension;
 import ru.craftysoft.orderingsystem.orderprocessing.extension.RedisExtension;
 import ru.craftysoft.orderingsystem.orderprocessing.proto.DecreaseCustomerAmountRequest;
 import ru.craftysoft.orderingsystem.util.db.DbHelper;
+import ru.craftysoft.orderingsystem.util.error.exception.RetryableException;
 
 import javax.inject.Inject;
 import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static ru.craftysoft.orderingsystem.orderprocessing.error.exception.InvocationExceptionCode.DB;
+import static ru.craftysoft.orderingsystem.orderprocessing.error.exception.InvocationExceptionCode.REDIS_SEND;
+import static ru.craftysoft.orderingsystem.orderprocessing.error.operation.ModuleOperationCode.EXTRACT_ORDER;
+import static ru.craftysoft.orderingsystem.orderprocessing.util.StackTraceHelper.listAppender;
+import static ru.craftysoft.orderingsystem.orderprocessing.util.StackTraceHelper.thenErrorStacktrace;
+import static ru.craftysoft.orderingsystem.util.error.type.ExceptionType.RETRYABLE;
 import static ru.craftysoft.orderingsystem.util.proto.ProtoUtils.moneyToBigDecimal;
 
 public class ExtractOrderOperationTest extends OperationTest {
@@ -75,9 +83,13 @@ public class ExtractOrderOperationTest extends OperationTest {
         var component = DaggerTestApplicationComponent.builder().build();
         component.inject(this);
         var reservedOrderId = reserveOrder();
+        var listAppender = listAppender(ExtractOrderOperation.class);
 
-        assertThrows(Exception.class, () -> operation.process().get());
+        operation.process().get();
 
+        var fullErrorCode = fullErrorCode(EXTRACT_ORDER, RETRYABLE, REDIS_SEND);
+        thenErrorStacktrace(listAppender, fullErrorCode, REDIS_SEND);
+        listAppender.stop();
         var order = dbHelper.selectOne(
                 connectionFactory().get(),
                 """
@@ -94,6 +106,17 @@ public class ExtractOrderOperationTest extends OperationTest {
                 reservedOrderId
         );
         assertEquals("reserved", order.status());
+    }
+
+    @Test
+    void processExtractError() {
+        var component = DaggerTestWithoutDbApplicationComponent.builder().build();
+        component.inject(this);
+
+        var exception = assertThrows(RetryableException.class, () -> operation.process().get());
+
+        var fullErrorCode = fullErrorCode(EXTRACT_ORDER, RETRYABLE, DB);
+        assertEquals(fullErrorCode, exception.getFullErrorCode());
     }
 
     @SneakyThrows

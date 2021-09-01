@@ -106,6 +106,8 @@ public class DecreaseCustomerAmountOperation {
                 .whenComplete(withMdc((unused, rollbackThrowable) -> {
                     if (rollbackThrowable != null) {
                         logError(log, processMessagePoint + ".rollback", rollbackThrowable);
+                    } else {
+                        log.info("{}.rollback.out", processMessagePoint);
                     }
                 }));
     }

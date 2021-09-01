@@ -10,6 +10,8 @@ import ru.craftysoft.orderingsystem.util.uuid.UuidUtils;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 import static ru.craftysoft.orderingsystem.orderprocessing.error.operation.ModuleOperationCode.DECREASE_EXECUTOR_AMOUNT;
 import static ru.craftysoft.orderingsystem.orderprocessing.service.redis.RedisClient.REDIS_MESSAGE_ID;
@@ -37,48 +39,51 @@ public class DecreaseExecutorAmountOperation {
         this.executorServiceClientAdapter = executorServiceClientAdapter;
     }
 
-    public void process() {
+    public CompletionStage<Void> process() {
         try (var ignored1 = MDC.putCloseable(TRACE_ID, UuidUtils.generateDefaultUuid());
              var ignored2 = MDC.putCloseable(SPAN_ID, UuidUtils.generateDefaultUuid());
              var ignored3 = MDC.putCloseable(OPERATION_NAME, DECREASE_EXECUTOR_AMOUNT.name())) {
-            redisClientAdapter.listenDecreaseExecutorAmountRequestMessages()
-                    .thenAccept(withMdc(requests -> {
-                        if (!requests.isEmpty()) {
-                            log.info("{}.in size={}", processPoint, requests.size());
-                            requests.forEach(this::processMessage);
-                            log.info("{}.out", processPoint);
-                        }
-                    }))
+            return redisClientAdapter.listenDecreaseExecutorAmountRequestMessages()
                     .whenComplete(withMdc((unused, throwable) -> {
                         if (throwable != null) {
                             logError(log, processPoint, throwable);
                         }
-                    }));
-        }
-    }
-
-    private void processMessage(Map.Entry<String, DecreaseExecutorAmountRequest> entry) {
-        try (var ignored = MDC.putCloseable(REDIS_MESSAGE_ID, entry.getKey())) {
-            executorServiceClientAdapter.decreaseAmount(entry.getValue())
-                    .whenComplete(withMdc((updateCustomerBalanceResponse, throwable) -> {
-                        if (throwable != null) {
-                            logError(log, processMessagePoint, throwable);
-                            retry(entry, throwable);
-                        } else {
-                            redisClientAdapter.sendMessageToIncrementCustomerAmountStreamInRollback(entry)
-                                    .whenComplete(withMdc((unused, nextStepThrowable) -> {
-                                        if (nextStepThrowable != null) {
-                                            logError(log, processMessagePoint, nextStepThrowable);
-                                            retry(entry, nextStepThrowable);
-                                        }
+                    }))
+                    .thenCompose(withMdc(requests -> {
+                        if (!requests.isEmpty()) {
+                            log.info("{}.in size={}", processPoint, requests.size());
+                            var futures = requests.stream()
+                                    .map(this::processMessage)
+                                    .toArray(value -> new CompletableFuture<?>[requests.size()]);
+                            return CompletableFuture.allOf(futures)
+                                    .whenComplete(withMdc((v, t) -> {
+                                        log.info("{}.out", processPoint);
                                     }));
                         }
+                        return new CompletableFuture<>();
                     }));
         }
     }
 
-    private void retry(Map.Entry<String, DecreaseExecutorAmountRequest> entry, Throwable throwable) {
-        redisClientAdapter.retryDecreaseExecutorAmountRequestMessage(entry, throwable)
+    private CompletableFuture<String> processMessage(Map.Entry<String, DecreaseExecutorAmountRequest> entry) {
+        try (var ignored = MDC.putCloseable(REDIS_MESSAGE_ID, entry.getKey())) {
+            return executorServiceClientAdapter.decreaseAmount(entry.getValue())
+                    .thenCompose(withMdc(updateCustomerBalanceResponse -> {
+                        return redisClientAdapter.sendMessageToIncrementCustomerAmountStreamInRollback(entry)
+                                .exceptionallyCompose(withMdc(nextStepThrowable -> {
+                                    logError(log, processMessagePoint, nextStepThrowable);
+                                    return retry(entry, nextStepThrowable);
+                                }));
+                    }))
+                    .exceptionallyCompose(withMdc(throwable -> {
+                        logError(log, processMessagePoint, throwable);
+                        return retry(entry, throwable);
+                    }));
+        }
+    }
+
+    private CompletionStage<String> retry(Map.Entry<String, DecreaseExecutorAmountRequest> entry, Throwable throwable) {
+        return redisClientAdapter.retryDecreaseExecutorAmountRequestMessage(entry, throwable)
                 .whenComplete(withMdc((ignored, retryThrowable) -> {
                     if (retryThrowable != null) {
                         logError(log, processMessagePoint + ".retry", retryThrowable);

@@ -10,6 +10,8 @@ import ru.craftysoft.orderingsystem.util.uuid.UuidUtils;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 import static ru.craftysoft.orderingsystem.orderprocessing.error.operation.ModuleOperationCode.RESERVE_ORDER;
 import static ru.craftysoft.orderingsystem.orderprocessing.service.redis.RedisClient.REDIS_MESSAGE_ID;
@@ -35,39 +37,46 @@ public class ReserveOrderOperation {
         this.orderDaoAdapter = orderDaoAdapter;
     }
 
-    public void process() {
+    public CompletionStage<Void> process() {
         try (var ignored1 = MDC.putCloseable(TRACE_ID, UuidUtils.generateDefaultUuid());
              var ignored2 = MDC.putCloseable(SPAN_ID, UuidUtils.generateDefaultUuid());
              var ignored3 = MDC.putCloseable(OPERATION_NAME, RESERVE_ORDER.name())) {
-            redisClientAdapter.listenReserveOrderRequestMessages()
-                    .thenAccept(withMdc(requests -> {
-                        if (!requests.isEmpty()) {
-                            log.info("{}.in size={}", processPoint, requests.size());
-                            requests.forEach(this::processMessage);
-                            log.info("{}.out", processPoint);
-                        }
-                    }))
+            return redisClientAdapter.listenReserveOrderRequestMessages()
                     .whenComplete(withMdc((unused, throwable) -> {
                         if (throwable != null) {
                             logError(log, processPoint, throwable);
                         }
+                    }))
+                    .thenCompose(withMdc(requests -> {
+                        if (!requests.isEmpty()) {
+                            log.info("{}.in size={}", processPoint, requests.size());
+                            var futures = requests.stream()
+                                    .map(this::processMessage)
+                                    .toArray(value -> new CompletableFuture<?>[requests.size()]);
+                            return CompletableFuture.allOf(futures)
+                                    .whenComplete(withMdc((v, t) -> {
+                                        log.info("{}.out", processPoint);
+                                    }));
+                        }
+                        return new CompletableFuture<>();
                     }));
         }
     }
 
-    private void processMessage(Map.Entry<String, ReserveOrderRequest> entry) {
+    private CompletableFuture<String> processMessage(Map.Entry<String, ReserveOrderRequest> entry) {
         try {
             MDC.put(REDIS_MESSAGE_ID, entry.getKey());
-            orderDaoAdapter.reserveOrder(entry.getValue());
-        } catch (Exception e) {
-            logError(log, processPoint, e);
-            redisClientAdapter.retryReserveOrderRequestMessage(entry, e)
-                    .whenComplete(withMdc((ignored, retryThrowable) -> {
-                        if (retryThrowable != null) {
-                            logError(log, processMessagePoint + ".retry", retryThrowable);
-                        } else {
-                            log.info("{}.retry.out", processMessagePoint);
-                        }
+            return orderDaoAdapter.reserveOrder(entry.getValue())
+                    .thenApply(v -> "nop")
+                    .exceptionallyCompose(withMdc(throwable -> {
+                        return redisClientAdapter.retryReserveOrderRequestMessage(entry, throwable)
+                                .whenComplete(withMdc((ignored, retryThrowable) -> {
+                                    if (retryThrowable != null) {
+                                        logError(log, processMessagePoint + ".retry", retryThrowable);
+                                    } else {
+                                        log.info("{}.retry.out", processMessagePoint);
+                                    }
+                                }));
                     }));
         } finally {
             MDC.remove(REDIS_MESSAGE_ID);
